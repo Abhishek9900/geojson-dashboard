@@ -1,0 +1,47 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: geojson-backend
+    restart: unless-stopped
+    environment:
+      - DEBUG=false
+      - ALLOWED_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000","http://frontend:3000"]
+      - MAX_UPLOAD_SIZE_MB=100
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - skynet
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: geojson-frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - skynet
+
+volumes:
+  backend-logs:
+
+networks:
+  skynet:
+    driver: bridge
+    name: skynet
