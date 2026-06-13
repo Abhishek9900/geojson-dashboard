@@ -31,8 +31,14 @@ A full-stack web application for uploading, validating, visualising, and editing
 
 ```bash
 git clone https://github.com/Abhishek9900/geojson-dashboard.git
+
 cd geojson-dashboard
+
+# Docker Compose will build the images for each service and then start the containers
 docker compose up --build
+
+# Allows the user to remove containers which were created in a previous run of docker-compose
+docker compose down --remove-orphans
 ```
 
 | Service  | URL                       |
