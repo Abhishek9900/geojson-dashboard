@@ -52,7 +52,7 @@ import {
   pageSizeChanged,
 } from "@/store/tableSlice";
 import type { FeatureFilter } from "@/types";
-import type { SortKey, SortDir } from "@/store/tableSlice";
+import type { SortKey } from "@/store/tableSlice";
 import type { TableRow } from "@/store/selectors";
 
 const FILTER_LABELS: Record<FeatureFilter, string> = {

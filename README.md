@@ -4,19 +4,20 @@ A full-stack web application for uploading, validating, visualising, and editing
 
 ## Features
 
-- **Upload** — drag-and-drop `.geojson` files (up to 100 MB).
-- **Validate** — detect invalid geometries (self-intersections, empty rings, null geometry) and exact-duplicate features.
-- **Auto-fix** — apply Shapely-computed geometry repairs with a single click.
-- **Map** — colour-coded MapLibre GL map with legend filtering, feature selection, and an edit mode for drawing new features, deleting features, and editing attribute properties.
-- **Table** — sortable, filterable feature table with inline property editing.
-- **Re-analyse** — after any edits, submit the updated FeatureCollection back to the backend for a fresh analysis report.
-- **Download** — export the current (possibly edited) collection as a `.geojson` file.
+1. **Upload** — Drag-and-drop or click to upload a `.geojson` file (up to 100 MB). The file is POSTed to the backend, which returns a full analysis report.
+2. **Map** — Colour-coded MapLibre GL map with legend filtering, feature selection, and an edit mode for drawing new features, deleting features, and editing attribute properties.
+3. **Auto-fix** — Apply Shapely-computed geometry repairs with a single click.
+4. **Inspect** — Summary cards show aggregate counts; the MapView renders features colour-coded by status; the IssuesPanel lists geometry errors and duplicate groups.
+5. **Table** — Sortable, filterable feature table with inline property editing.
+6. **Edit** — Features can be edited on the map (draw tools) or via inline property editing in the FeatureTable. Edits are staged locally.
+7. **Save** — This button submits the current (possibly edited) FeatureCollection back to the backend for a fresh analysis.
+8. **Download** — The current FeatureCollection (including edits) is serialised to a `.geojson` file and downloaded.
 
 ## Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 16 · TypeScript · Tailwind CSS · MapLibre GL JS · Turf.js |
+| Frontend | Next.js 16 · TypeScript · Redux Toolkit 2 · Tailwind CSS · MapLibre GL JS · Turf.js |
 | Backend | FastAPI · Shapely · Pydantic v2 · Loguru |
 | Containerisation | Docker · Docker Compose |
 
@@ -53,16 +54,16 @@ docker compose up --build
 
 ```bash
 cd backend
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000 # python -m uvicorn main:app --reload --port 8000
+python3 -m uvicorn main:app --reload --port 8000 # uvicorn main:app --reload --port 8000
 ```
 
 Run tests:
 
 ```bash
-pytest tests/ -v
+python3 -m pytest tests/ -v
 ```
 
 ### Frontend (Next.js 16 + TypeScript)
@@ -130,23 +131,42 @@ geojson-dashboard/
 │   │   └── test_geojson.py        # pytest test suite
 │   └── main.py                    # Application entry point
 └── frontend/
-    └── src/
-        ├── app/
-        │   └── page.tsx            # Main dashboard page
-        ├── components/
-        │   ├── map/MapView.tsx     # MapLibre GL map + edit toolbar
-        │   ├── table/FeatureTable.tsx
-        │   ├── ui/
-        │   │   ├── Header.tsx
-        │   │   ├── IssuesPanel.tsx
-        │   │   └── SummaryCards.tsx
-        │   └── upload/UploadZone.tsx
-        ├── lib/
-        │   ├── api.ts              # HTTP client
-        │   └── geojson-utils.ts   # Pure utility functions
-        ├── types/index.ts          # Shared TypeScript types
-        └── __tests__/
-            └── dashboard.test.tsx  # Jest test suite
+    ├── src/
+    │   ├── app/
+    │   │   ├── layout.tsx         # Root layout; wraps children in ReduxProvider + Toaster
+    │   │   ├── page.tsx           # Main dashboard page (orchestrator component)
+    │   │   └── globals.css        # Tailwind base styles
+    │   ├── components/
+    │   │   ├── map/
+    │   │   │   └── MapView.tsx    # MapLibre GL map with draw tools and feature highlighting
+    │   │   ├── table/
+    │   │   │   └── FeatureTable.tsx # Paginated, searchable, sortable, editable feature table
+    │   │   ├── ui/
+    │   │   │   ├── Header.tsx      # Sticky top bar with brand, filename, and action buttons
+    │   │   │   ├── IssuesPanel.tsx # Scrollable list of geometry issues and duplicate groups
+    │   │   │   └── SummaryCards.tsx # Four metric cards (total / valid / invalid / duplicates)
+    │   │   └── upload/
+    │   │       └── UploadZone.tsx # Drag-and-drop upload zone with progress bar
+    │   ├── lib/
+    │   │   ├── api.ts             # HTTP client for all backend endpoints
+    │   │   └── geojson-utils.ts   # Pure GeoJSON utility functions
+    │   ├── providers/
+    │   │   └── ReduxProvider.tsx  # Client-side Redux <Provider> wrapper
+    │   ├── store/
+    │   │   ├── index.ts           # Barrel export
+    │   │   ├── store.ts           # configureStore; exports RootState / AppDispatch / AppThunk
+    │   │   ├── hooks.ts           # Typed useAppDispatch / useAppSelector
+    │   │   ├── dashboardSlice.ts  # Upload + analysis + feature-edit state
+    │   │   ├── tableSlice.ts      # Filter / search / sort / pagination UI state
+    │   │   ├── dashboardThunks.ts # uploadFile and analyseCurrentFC thunks
+    │   │   └── selectors.ts      # Memoised derived-data selectors
+    │   ├── types/
+    │   │   └── index.ts          # Shared TypeScript interfaces (mirrors backend Pydantic models)
+    │   └── __mocks__/
+    │       └── maplibre-gl.ts     # Jest mock for maplibre-gl (no WebGL in jsdom)
+    ├── __tests__/
+    │   └── dashboard.test.tsx     # Full test suite
+    ├── *.ts, *.json        # Config files
 ```
 
 ---
@@ -161,6 +181,29 @@ See the interactive Swagger docs at `http://localhost:8000/docs`.
 | `POST` | `/api/geojson/upload`   | Upload and process a `.geojson` file                |
 | `POST` | `/api/geojson/update`   | Re-analyse an edited FeatureCollection              |
 | `POST` | `/api/geojson/validate` | Validate a file; returns summary only (no features) |
+
+## Architecture overview
+
+```
+Browser (Next.js 16)
+    │  multipart file upload / JSON
+    ▼
+FastAPI backend (Python 3.14+)
+    │  Pydantic validation → Shapely processing
+    ▼
+JSON response (ProcessGeoJSONResponse)
+    │
+    ▼
+React state (page.tsx)
+    ├─ MapView       (MapLibre GL)
+    ├─ IssuesPanel
+    ├─ FeatureTable
+    └─ SummaryCards
+```
+
+The backend is stateless — every request carries the full FeatureCollection and returns a complete analysis result.  There is no database; all state lives in the browser for the lifetime of a session.
+
+---
 
 ## GeoJSON Architecture Notes
 

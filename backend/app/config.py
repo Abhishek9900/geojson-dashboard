@@ -1,9 +1,8 @@
 """
 Application configuration using Pydantic Settings.
 """
-
-from pydantic_settings import BaseSettings
 from typing import List
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -20,11 +19,12 @@ class Settings(BaseSettings):
     ]
 
     # File upload limits
-    max_upload_size_mb: int = 100  # 100 MB max
+    max_upload_size_mb: int = 100
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 
 settings = Settings()
