@@ -58,17 +58,24 @@ The ESA Copernicus programme provides free, open-access satellite data through t
 
 **Key facts:**
 
-- Works **day and night, through clouds and rain** — extremely important for Germany's cloudy climate
-- 10 m spatial resolution (GRD product)
-- Revisit time: ~6 days (with both satellites)
-- Measures **backscatter** — how strongly a surface reflects radar signals
-- Polarizations: **VV** (vertical-vertical) and **VH** (vertical-horizontal)
+* Works **day and night, through clouds and rain** — extremely important for Germany's cloudy climate
+* C-band radar (~5.4 GHz)
+* 10 m spatial resolution (GRD product)
+* Current operational constellation:
+
+  * Sentinel-1A
+  * Sentinel-1C (launched in 2024, restoring full constellation capability)
+* Revisit time: ~6 days (with two operational satellites)
+* Measures **backscatter** — how strongly a surface reflects radar signals
+* Polarizations: **VV** (vertical-vertical) and **VH** (vertical-horizontal)
 
 **What it sees well:**
 
-- Flooded areas and wetlands (water absorbs radar → very dark signal)
-- Forest structure (canopy density, biomass)
-- Bare soil vs. vegetated land
+* Flooded areas and wetlands (water absorbs radar → very dark signal)
+* Forest structure (canopy density, biomass)
+* Soil moisture
+* Bare soil vs. vegetated land
+* Agricultural field conditions
 
 **Limitation:** Cannot directly identify tree species or subtle vegetation types as well as optical sensors.
 
@@ -80,25 +87,33 @@ The ESA Copernicus programme provides free, open-access satellite data through t
 
 **Key facts:**
 
-- 10 m resolution (for key bands), 20 m for vegetation-specific bands
-- Revisit: every 5 days
-- Available since 2017 (Level-2A surface reflectance)
-- DLR provides Germany-specific Level-2A tiles processed with the **MAJA algorithm**, offering improved atmospheric correction and cloud masking compared to standard ESA products
+* 13 spectral bands
+* 10 m resolution (for key bands), 20 m for vegetation-specific bands
+* Revisit: every 5 days
+* Level-2A surface reflectance products are operationally available across Europe and globally
+* DLR provides Germany-specific Level-2A tiles processed with the **MAJA algorithm**, offering improved atmospheric correction and cloud masking compared to standard ESA products
 
 **Important bands for our task:**
 
-| Band | Name | Wavelength | What it tells us |
-|---|---|---|---|
-| B2 | Blue | 490 nm | Water bodies, aerosols |
-| B3 | Green | 560 nm | Vegetation vigour |
-| B4 | Red | 665 nm | Chlorophyll absorption |
-| B8 | Near-Infrared (NIR) | 842 nm | Healthy vegetation → high reflectance |
-| B5, B6, B7, B8A | Red Edge | 705–865 nm | Forest stress, species discrimination |
-| B11, B12 | SWIR | 1610–2190 nm | Soil moisture, dead wood, burn scars |
+| Band            | Name                | Wavelength   | What it tells us                      |
+| --------------- | ------------------- | ------------ | ------------------------------------- |
+| B2              | Blue                | 490 nm       | Water bodies, aerosols                |
+| B3              | Green               | 560 nm       | Vegetation vigour                     |
+| B4              | Red                 | 665 nm       | Chlorophyll absorption                |
+| B8              | Near-Infrared (NIR) | 842 nm       | Healthy vegetation → high reflectance |
+| B5, B6, B7, B8A | Red Edge            | 705–865 nm   | Forest stress, species discrimination |
+| B11, B12        | SWIR                | 1610–2190 nm | Soil moisture, dead wood, burn scars  |
 
 **Key vegetation index:**
 
-- **NDVI** = (B8 − B4) / (B8 + B4): Ranges from -1 to +1; healthy dense forest → ~0.7–0.9
+* **NDVI** = (B8 − B4) / (B8 + B4): Ranges from -1 to +1; healthy dense forest → ~0.7–0.9
+
+**Additional useful indices:**
+
+* **NDWI**: Surface water and wetland detection
+* **NDMI**: Vegetation moisture content
+* **NBR**: Burn severity and disturbance mapping
+* **EVI**: Enhanced vegetation monitoring in dense forests
 
 **Limitation:** Clouds block the signal. Germany averages 150–180 cloudy days per year. A single Sentinel-2 image may be >50% cloud-covered.
 
@@ -106,32 +121,120 @@ The ESA Copernicus programme provides free, open-access satellite data through t
 
 ### 3.3 Sentinel-3 — Coarse-Resolution Land/Ocean Monitor
 
-- 300 m resolution; too coarse for local/regional forest mapping in Germany
-- Useful for **large-scale vegetation trend monitoring** (NDVI at national level)
-- Good complement for temporal trend analysis over seasons
+**What it does:** Provides medium-resolution observations of land, ocean, and atmosphere using instruments such as OLCI (Ocean and Land Colour Instrument) and SLSTR (Sea and Land Surface Temperature Radiometer).
+
+**Key facts:**
+
+* 300 m resolution (OLCI)
+* Daily to near-daily global coverage
+* Measures vegetation productivity, land surface temperature, and drought indicators
+
+**Useful for:**
+
+* Large-scale vegetation trend monitoring
+* National-scale NDVI analysis
+* Drought and heat stress monitoring
+* Climate and ecosystem studies
+
+**Limitation:** Too coarse for local/regional forest mapping or habitat classification in Germany.
 
 ---
 
-### 3.4 Sentinel-5P — Atmospheric Composition
+### 3.4 Sentinel-4 — Geostationary Atmospheric Monitoring
 
-- Not a land surface imager; monitors air pollutants (NO₂, CH₄, CO)
-- Methane (CH₄) from S5P **can indirectly indicate peatland degradation** (peat decomposition releases CH₄)
-- Optional supplementary data source
+**What it does:** Monitors atmospheric composition over Europe from geostationary orbit using instruments hosted on Meteosat Third Generation satellites.
+
+**Key facts:**
+
+* Hourly observations across Europe
+* Measures:
+
+  * Nitrogen dioxide (NO₂)
+  * Ozone (O₃)
+  * Sulfur dioxide (SO₂)
+  * Formaldehyde (HCHO)
+  * Aerosols
+* Designed primarily for air-quality monitoring
+
+**Useful for:**
+
+* Assessing pollution impacts on forests
+* Studying atmospheric stressors affecting ecosystems
+* Environmental impact assessments
+
+**Limitation:** Does not provide land-surface imagery and cannot be used for vegetation or habitat mapping.
+
+---
+
+### 3.5 Sentinel-5P — Atmospheric Composition
+
+**What it does:** Measures atmospheric trace gases using the TROPOMI instrument.
+
+**Key facts:**
+
+* Monitors:
+
+  * Methane (CH₄)
+  * Nitrogen dioxide (NO₂)
+  * Carbon monoxide (CO)
+  * Sulfur dioxide (SO₂)
+  * Ozone (O₃)
+* Global daily coverage
+* Provides some of the highest-resolution atmospheric composition measurements currently available from space
+
+**Useful for:**
+
+* Monitoring greenhouse gas emissions
+* Detecting methane emissions from peatland degradation
+* Studying air quality and ecosystem interactions
+* Supporting climate and carbon accounting studies
+
+**Limitation:** Spatial resolution is far too coarse for direct forest or wetland mapping.
+
+---
+
+### 3.6 Sentinel-6 — Sea Level and Climate Monitoring
+
+**What it does:** Measures global sea-surface height using radar altimetry, continuing the long-term climate record established by the TOPEX/Poseidon and Jason missions.
+
+**Key facts:**
+
+* Centimetre-level sea-surface height measurements
+* Global ocean coverage
+* Supports long-term climate monitoring
+
+**Useful for:**
+
+* Climate change studies
+* Coastal wetland vulnerability assessments
+* Hydrological and climate modelling
+
+**Limitation:** No land-cover or vegetation imaging capability.
 
 ---
 
 ### Comparison Table: Sentinel Satellites for Forest/Wetland Monitoring
 
-| Feature | Sentinel-1 (SAR) | Sentinel-2 (Optical) | Sentinel-3 |
-|---|---|---|---|
-| **Spatial Resolution** | 10 m | 10–20 m | 300 m |
-| **Works in clouds?** | ✅ Yes | ❌ No | ❌ No |
-| **Works at night?** | ✅ Yes | ❌ No | ❌ No |
-| **Revisit frequency** | ~6 days | ~5 days | ~1–2 days |
-| **Vegetation detail** | Moderate | ✅ High (13 bands) | Low |
-| **Wetland detection** | ✅ Excellent | Good | Moderate |
-| **Tree species** | Poor | ✅ Good (red edge) | Poor |
-| **Free & open?** | ✅ Yes | ✅ Yes | ✅ Yes |
+| Feature                    | Sentinel-1 (SAR) | Sentinel-2 (Optical) | Sentinel-3 | Sentinel-4           | Sentinel-5P | Sentinel-6      |
+| -------------------------- | ---------------- | -------------------- | ---------- | -------------------- | ----------- | --------------- |
+| **Spatial Resolution**     | 10 m             | 10–20 m              | 300–1000 m | Atmospheric Products | ~3.5–7 km+  | Altimetry Track |
+| **Works in clouds?**       | ✅ Yes            | ❌ No                 | ❌ No       | N/A                  | N/A         | N/A             |
+| **Works at night?**        | ✅ Yes            | ❌ No                 | Partial    | ✅ Yes                | ✅ Yes       | ✅ Yes           |
+| **Vegetation detail**      | Moderate         | ✅ High (13 bands)    | Moderate   | ❌ None               | ❌ None      | ❌ None          |
+| **Wetland detection**      | ✅ Excellent      | Good                 | Moderate   | ❌ No                 | Indirect    | ❌ No            |
+| **Tree species**           | Poor             | ✅ Good (red edge)    | Poor       | ❌ No                 | ❌ No        | ❌ No            |
+| **Atmospheric monitoring** | ❌ No             | ❌ No                 | Limited    | ✅ Excellent          | ✅ Excellent | ❌ No            |
+| **Climate monitoring**     | Moderate         | Moderate             | ✅ Strong   | Strong               | Strong      | ✅ Strong        |
+| **Free & open?**           | ✅ Yes            | ✅ Yes                | ✅ Yes      | ✅ Yes                | ✅ Yes       | ✅ Yes           |
+
+---
+
+### Recommended Combination for Germany
+
+For forest and wetland monitoring in Germany:
+
+1. **Sentinel-2** → primary vegetation and habitat classification.
+2. **Sentinel-1** → cloud-independent wetland, flood, and moisture monitoring.
 
 ---
 
