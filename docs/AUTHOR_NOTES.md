@@ -72,7 +72,7 @@ Redux Toolkit removes the boilerplate objections to classic Redux: `createSlice`
 
 The backend language was never a difficult choice — Python dominates geospatial tooling, and the libraries required (`shapely`, `pyproj`, `fiona`, `rasterio`) have no serious equivalents in Node or Go.
 
-Within the Python ecosystem, **FastAPI** was chosen over Flask and Django REST Framework:
+Within the Python ecosystem, **FastAPI** was chosen over Flask and Django REST Framework as personal preference:
 
 - **Performance.** FastAPI is built on Starlette (async) and Uvicorn, making it one of the fastest Python web frameworks available. For a file-upload endpoint that performs Shapely geometry operations, async handling of concurrent requests matters.
 - **Pydantic v2 integration.** Request and response schemas are defined once as Pydantic models and are automatically validated, serialised, and exposed in the OpenAPI spec. This eliminates a whole class of serialisation bugs and means the Swagger docs at `/docs` are always accurate.
@@ -102,10 +102,10 @@ The backend is intentionally **stateless** — every request carries the full Fe
 
 ### File size and performance
 
-The current implementation loads the **entire GeoJSON file into browser memory** and renders it as a single source in MapLibre GL. This works well up to approximately 5 000–10 000 simple features, but degrades beyond that:
+The current implementation loads the **entire GeoJSON file into browser memory** and renders it as a single source in MapLibre GL. This works well up to approximately 5000–10000 simple features, but degrades beyond that:
 
 - Large files take longer to parse in the browser even before the upload begins.
-- The backend Shapely validation is synchronous and single-threaded. A file with 50 000 features will block the Uvicorn worker for several seconds.
+- The backend Shapely validation is synchronous and single-threaded. A file with 50000 features will block the Uvicorn worker for several seconds.
 - MapLibre GL rendering slows noticeably with complex polygon geometry and many thousands of features.
 
 **Suggested approaches for large datasets:**

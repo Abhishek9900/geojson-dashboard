@@ -1,9 +1,5 @@
 # GeoAI for Tracking Deforestation & Wetland Loss in Germany (2020–2025)
 
-## A Practical, Beginner-Friendly Guide Using Geospatial Foundation Models
-
----
-
 ## Table of Contents
 
 1. [Why Does This Matter? The Problem at a Glance](#1-why-does-this-matter)
@@ -24,7 +20,7 @@
 
 Germany has lost significant forest and wetland areas over the past decades due to **bark beetle outbreaks**, **drought stress** (especially 2018–2020), **land conversion**, and **peatland drainage for agriculture**. Between 2018 and 2022, Germany lost roughly 500,000 hectares of forest — a crisis visible from space.
 
-**Peatlands** (German: *Moore*) are especially critical: they store enormous amounts of carbon, and their degradation releases CO₂. The EU's Nature Restoration Law and Germany's national biodiversity strategy both require regular, accurate monitoring of these habitats.
+**Peatlands** are especially critical: they store enormous amounts of carbon, and their degradation releases CO₂. The EU's Nature Restoration Law and Germany's national biodiversity strategy both require regular, accurate monitoring of these habitats.
 
 > **Why can't we just look at photos?** Germany covers 357,000 km². Manual inspection of even a fraction of this area every year is impossible. Satellites can image the entire country every few days — and AI can read those images automatically.
 
@@ -229,7 +225,7 @@ The ESA Copernicus programme provides free, open-access satellite data through t
 
 ---
 
-### Recommended Combination for Germany
+### Data combination for our problem
 
 For forest and wetland monitoring in Germany:
 
@@ -626,4 +622,4 @@ Standard ESA S2 L2A uses the Sen2Cor algorithm, which processes each image indep
 
 ---
 
-*Document prepared for educational and research planning purposes. Scope: Germany, 2020–2025. Last updated: June 2026.*
+*Document prepared for educational and research planning purposes for [GRAS Global Risk Assessment Services GmbH](https://www.gras-system.org/). Scope: Germany, 2020–2025. Last updated: June 2026.*
