@@ -83,10 +83,17 @@ export const selectDeletedIndices = createSelector(
  * with live FeatureCollection metadata.
  */
 export interface TableRow {
-  /** Position in the live featureCollection.features array. */
+  /**
+   * For live features: position in featureCollection.features (>= 0).
+   * For deleted features: -(originalIndex + 1) — always negative so it never
+   * collides with a live array position. Used as React key only; not used
+   * for array lookups in the component.
+   */
   index: number;
   /** Null for features drawn after the last analysis. */
   pf: ProcessedFeature | null;
+  /** The stable _originalIndex from the backend, if this is a backend feature. */
+  originalIndex: number | null;
   geomType: string;
   /** True when this feature was drawn after the last upload/analysis. */
   isDrawn: boolean;
@@ -96,7 +103,14 @@ export interface TableRow {
   isEdited: boolean;
 }
 
-/** All rows in display order before filtering. */
+/**
+ * All rows in display order before filtering.
+ *
+ * Deleted rows use a negative index sentinel (-(originalIndex + 1)) so their
+ * `index` field never collides with live FC array positions. Components must
+ * use `row.originalIndex` for property lookups on deleted rows, and
+ * `row.index` only for live rows.
+ */
 export const selectAllRows = createSelector(
   selectAllProcessedFeatures,
   selectFeatureCollection,
@@ -104,11 +118,11 @@ export const selectAllRows = createSelector(
   (features, fc, deletedIndices): TableRow[] => {
     const rows: TableRow[] = [];
 
-    // 1. Deleted backend features (in response but no longer in live FC).
     features.forEach((pf, i) => {
       if (deletedIndices.has(i)) {
         rows.push({
-          index: i,
+          index: -(i + 1),       // negative sentinel — never collides with live indices
+          originalIndex: i,
           pf,
           geomType: pf.feature.geometry?.type ?? "null",
           isDrawn: false,
@@ -126,6 +140,7 @@ export const selectAllRows = createSelector(
       const isEdited = f.properties?._edited === true;
       rows.push({
         index: idx,
+        originalIndex: originalIdx ?? null,
         pf,
         geomType: f.geometry?.type ?? "null",
         isDrawn,
@@ -175,22 +190,20 @@ const selectFilteredRows = createSelector(
 const selectSearchedRows = createSelector(
   selectFilteredRows,
   selectSearchQuery,
-  // We also need the live FC for property access on drawn features.
   selectFeatureCollection,
   (rows, query, fc): TableRow[] => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
 
     return rows.filter((row) => {
-      // Index always matches if the query is a number.
       if (String(row.index).includes(q)) return true;
       if (row.geomType.toLowerCase().includes(q)) return true;
 
-      // Search property values.
-      const rawProps =
-        fc?.features[row.index]?.properties ??
-        row.pf?.feature.properties ??
-        {};
+      // For live rows use the FC array position; for deleted rows use pf props.
+      const rawProps = row.isDeleted
+        ? row.pf?.feature.properties ?? {}
+        : fc?.features[row.index]?.properties ?? row.pf?.feature.properties ?? {};
+
       return Object.entries(rawProps).some(
         ([k, v]) =>
           !k.startsWith("_") &&
@@ -227,10 +240,13 @@ const selectSortedRows = createSelector(
   }
 );
 
-/** Total number of rows matching the current filter + search (for pagination UI). */
+/**
+ * Total number of rows matching the current filter + search (for pagination).
+ * Deleted rows are pinned outside pagination so they are excluded from the count.
+ */
 export const selectTotalFilteredCount = createSelector(
   selectSortedRows,
-  (rows) => rows.length
+  (rows) => rows.filter((r) => !r.isDeleted).length
 );
 
 /** Total number of pages given the current page size. */
@@ -240,13 +256,23 @@ export const selectTotalPages = createSelector(
   (total, pageSize) => Math.max(1, Math.ceil(total / pageSize))
 );
 
-/** The rows for the current page — what FeatureTable actually renders. */
+/**
+ * The rows for the current page — what FeatureTable actually renders.
+ *
+ * Deleted rows are pinned above the current page's live rows on every page
+ * so the user always sees what is staged for removal before saving. They are
+ * not counted toward the page size or total page count.
+ */
 export const selectPagedRows = createSelector(
   selectSortedRows,
   selectCurrentPage,
   selectPageSize,
   (rows, page, pageSize): TableRow[] => {
+    const deletedRows = rows.filter((r) => r.isDeleted);
+    const liveRows = rows.filter((r) => !r.isDeleted);
     const start = (page - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
+    const pageOfLive = liveRows.slice(start, start + pageSize);
+    // Deleted rows pin above every page so pending deletions are always visible.
+    return [...deletedRows, ...pageOfLive];
   }
 );

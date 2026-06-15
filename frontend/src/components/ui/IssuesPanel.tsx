@@ -7,14 +7,25 @@
 
 import { AlertTriangle, Copy, Wrench, Check } from "lucide-react";
 import type { AnalysisSummary, GeometryIssue } from "@/types";
+import type { FeatureCollection } from "geojson";
 
 interface IssuesPanelProps {
   summary: AnalysisSummary;
+  featureCollection: FeatureCollection | null;
   onSelectFeature: (index: number) => void;
   onApplyFix?: (issue: GeometryIssue) => void;
 }
 
-export function IssuesPanel({ summary, onSelectFeature, onApplyFix }: IssuesPanelProps) {
+// Helper to resolve originalIndex → live FC array position
+function resolveLiveIndex(fc: FeatureCollection | null, originalIndex: number): number {
+  if (!fc) return originalIndex;
+  const idx = fc.features.findIndex(
+    (f) => f.properties?._originalIndex === originalIndex
+  );
+  return idx === -1 ? originalIndex : idx;
+}
+
+export function IssuesPanel({ summary, featureCollection, onSelectFeature, onApplyFix }: IssuesPanelProps) {
   const hasIssues = summary.issues.length > 0 || summary.duplicate_groups_detail.length > 0;
 
   const fixableCount = summary.issues.filter(
@@ -63,7 +74,8 @@ export function IssuesPanel({ summary, onSelectFeature, onApplyFix }: IssuesPane
             >
               <div className="flex items-start justify-between gap-2">
                 <button
-                  onClick={() => onSelectFeature(issue.feature_index)}
+                  // Issues chip click
+                  onClick={() => onSelectFeature(resolveLiveIndex(featureCollection, issue.feature_index))}
                   className="flex-1 min-w-0 text-left group"
                 >
                   <p className="text-xs font-mono text-red-300 truncate group-hover:text-red-200 transition-colors">
@@ -123,7 +135,8 @@ export function IssuesPanel({ summary, onSelectFeature, onApplyFix }: IssuesPane
               {group.feature_indices.map((idx) => (
                 <button
                   key={idx}
-                  onClick={() => onSelectFeature(idx)}
+                  // Duplicate group chip click  
+                  onClick={() => onSelectFeature(resolveLiveIndex(featureCollection, idx))}
                   className="text-[10px] font-mono bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 px-1.5 py-0.5 rounded transition-colors"
                 >
                   #{idx}

@@ -142,6 +142,7 @@ export default function DashboardPage() {
               <div className="xl:col-span-1">
                 <IssuesPanel
                   summary={response.summary}
+                  featureCollection={featureCollection}
                   onSelectFeature={handleSelectFeature}
                   onApplyFix={handleApplyFix}
                 />

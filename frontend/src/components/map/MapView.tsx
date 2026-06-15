@@ -525,16 +525,23 @@ export function MapView({
   // Edit-mode actions
   // ---------------------------------------------------------------------------
 
-  function handleDeleteSelected() {
-    if (selectedIndex == null || selectedIndex < 0) return;
-    const updated: FeatureCollection = {
-      ...editedFC,
-      features: editedFC.features.filter((_, i) => i !== selectedIndex),
-    };
-    editedFCRef.current = updated;
-    setEditedFC(updated);
-    onSelectFeature(-1);
-  }
+function handleDeleteSelected() {
+  if (selectedIndex == null || selectedIndex < 0) return;
+  const targetFeature = editedFC.features[selectedIndex];
+  const targetOriginalIndex = targetFeature?.properties?._originalIndex as number | undefined;
+
+  const updated: FeatureCollection = {
+    ...editedFC,
+    features: editedFC.features.filter((f, i) =>
+      targetOriginalIndex != null
+        ? f.properties?._originalIndex !== targetOriginalIndex
+        : i !== selectedIndex
+    ),
+  };
+  editedFCRef.current = updated;
+  setEditedFC(updated);
+  onSelectFeature(-1);
+}
 
   function handleOpenAttrEdit() {
     if (selectedIndex == null || selectedIndex < 0) return;

@@ -268,10 +268,9 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
               const isSelected = index === selectedIndex;
               const isEditing = editingIndex === index;
 
-              const rawProps =
-                featureCollection?.features[index]?.properties ??
-                pf?.feature.properties ??
-                {};
+              const rawProps = row.isDeleted
+                ? pf?.feature.properties ?? {}
+                : featureCollection?.features[index]?.properties ?? pf?.feature.properties ?? {};
               const displayProps = Object.entries(rawProps).filter(
                 ([k]) => !k.startsWith("_")
               );
