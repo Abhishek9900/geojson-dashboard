@@ -211,20 +211,24 @@ The backend is stateless — every request carries the full FeatureCollection an
 
 ---
 
-## GeoJSON Architecture Notes
+## Additional documents
 
-For scaling to a production SaaS GIS platform:
+1. [GeoAI Deforestation Research Germany](./docs/GeoAI_Deforestation_Research_Germany.md)
+2. [Frontend Technical Documentation](./docs/FRONTEND_TECHNICAL_DOCS.md)
+3. [Backend Technical Documentation](./docs/BACKEND_TECHNICAL_DOCS.md)
+4. [Author Notes](./docs/AUTHOR_NOTES.md)
 
-```
-Client Upload (.geojson)
-    ↓
-FastAPI preprocessing (Shapely validation, duplicate detection)
-    ↓
-PostGIS storage (spatial indexing, ST_IsValid, ST_MakeValid)
-    ↓
-GDAL → Vector Tiles (.mvt / .pbf)
-    ↓
-MapLibre GL JS (tile rendering, fast at scale)
-```
+---
 
-The current implementation uses raw GeoJSON rendering, which is suitable for files up to ~10 000 features. For larger datasets, move to the vector tiles pipeline described above.
+## Author
+
+**Abhishek Kripal**  
+M.Sc. Geodetic Engineering  | B.Tech. Computer Science & Engineering  
+Full Stack Developer | Geodesy  
+Bonn, Germany
+
+[Email](abhishek.kripal@uni-bonn.de) | [LinkedIn](https://www.linkedin.com/in/abhishek-kripal/) | [GitHub](https://github.com/Abhishek9900)
+
+---
+
+*Document prepared for [GRAS Global Risk Assessment Services GmbH](https://www.gras-system.org/). Last updated: June 2026.*

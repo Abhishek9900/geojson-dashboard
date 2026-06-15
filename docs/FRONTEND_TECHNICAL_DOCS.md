@@ -26,6 +26,7 @@
 9. [State Management Data Flow](#9-state-management-data-flow)
 10. [Testing](#10-testing)
 11. [Configuration Files](#11-configuration-files)
+12. [GeoJSON Architecture Notes](#12-geojson-architecture-notes)
 
 ---
 
@@ -397,6 +398,7 @@ interface TableRow {
 **`src/app/page.tsx`** — Orchestrator component. Reads state from selectors, converts user interactions into dispatched actions/thunks, and passes props down to leaf components. Contains no business logic itself.
 
 **Conditional rendering:**
+
 - `!hasData` → shows `<UploadZone>`
 - `hasData` → shows `<SummaryCards>`, `<MapView>` + `<IssuesPanel>` side-by-side, then `<FeatureTable>`
 
@@ -446,6 +448,7 @@ interface HeaderProps {
 Drag-and-drop zone powered by `react-dropzone`. Accepts only `.geojson` files (MIME types `application/json` and `application/geo+json`), max 1 file, max 100 MB.
 
 **States:**
+
 - `idle` — Upload icon, text prompt, browse link
 - `isDragActive` — FileJson icon, "Drop your .geojson file here"
 - `uploading` — Spinner, "Processing... {progress}%", progress bar
@@ -531,6 +534,7 @@ Paginated, searchable, sortable, and inline-editable feature list. Reads all sta
 **Local state:** `editingIndex`, `editProps`, `newPropKey`, `newPropValue` (inline edit form).
 
 **Features:**
+
 - Filter tabs (All / Valid / Issues / Duplicates) with count badges
 - Free-text search bar
 - Sortable columns (index, type, valid, duplicate, area) with chevron indicators
@@ -582,6 +586,7 @@ Subscribed components re-render with new derived data
 **Feature index lifetime:**
 
 A `_originalIndex` stamp is applied to each feature in the live `FeatureCollection` when a backend response is processed (`buildStampedFC`). This stamp is the stable link between:
+
 - A row in `FeatureTable`
 - A map feature in `MapView`
 - An issue in `IssuesPanel`
@@ -632,6 +637,7 @@ npm run test:watch # watch mode
 **`src/__mocks__/maplibre-gl.ts`** — Jest manual mock. Replaces `maplibre-gl` with a minimal stub so `MapView` can be imported without WebGL. `MapView` itself is not rendered in tests.
 
 The mock is registered in `jest.config.ts`:
+
 ```ts
 moduleNameMapper: {
   "^maplibre-gl$": "<rootDir>/src/__mocks__/maplibre-gl.ts",
@@ -671,6 +677,7 @@ moduleNameMapper: {
 ### `Dockerfile`
 
 Multi-stage build:
+
 1. **deps** — installs `node_modules` from `package-lock.json`
 2. **builder** — copies source, runs `next build`
 3. **runner** — minimal Node 20 Alpine image, copies only the `.next/standalone` output
@@ -680,3 +687,23 @@ Multi-stage build:
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
+
+---
+
+## 12. GeoJSON Architecture Notes
+
+For scaling to a production SaaS GIS platform:
+
+```
+Client Upload (.geojson)
+    ↓
+FastAPI preprocessing (Shapely validation, duplicate detection)
+    ↓
+PostGIS storage (spatial indexing, ST_IsValid, ST_MakeValid)
+    ↓
+GDAL → Vector Tiles (.mvt / .pbf)
+    ↓
+MapLibre GL JS (tile rendering, fast at scale)
+```
+
+The current implementation uses raw GeoJSON rendering, which is suitable for files up to ~10 000 features. For larger datasets, move to the vector tiles pipeline described above.
