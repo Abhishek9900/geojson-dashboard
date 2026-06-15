@@ -352,52 +352,54 @@ Think of it like this: a person who has spent years looking at maps and satellit
 
 Here is the full pipeline, explained simply at each stage.
 
+![GeoAI Workflow Pipeline](./geoai_workflow_pipeline.png)
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    DATA ACQUISITION                                  │
-│  S2 MAJA (DLR) + S1 GRD (Copernicus) + COP-DEM                    │
-│  Period: 2020–2025 | Scope: Germany                                 │
+│                   1. DATA ACQUISITION                               │
+│          • S2 MAJA (DLR) + S1 GRD (Copernicus) + COP-DEM            │
+│          • Period: 2020–2025 | Scope: Germany                       │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    PREPROCESSING                                     │
-│  • Cloud masking (MAJA CLM layer for S2)                           │
-│  • Median compositing per season (spring/summer/autumn)            │
-│  • S1 preprocessing: speckle filtering, terrain correction         │
+│                   2. PREPROCESSING                                  │
+│  • Cloud masking (MAJA CLM layer for S2)                            │
+│  • Median compositing per season (spring/summer/autumn)             │
+│  • S1 preprocessing: speckle filtering, terrain correction          │
 │  • Stack all layers per time step                                   │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                LABEL CREATION (LIMITED BUDGET)                      │
-│  Step A: Automated label pool from BKG/HRL/GlobalForestWatch       │
-│  Step B: Manual refinement of ~500–1000 high-confidence polygons   │
-│  Step C: Sample migration across years (Moharrami et al. method)   │
+│               3. LABEL CREATION (LIMITED BUDGET)                    │
+│  Step A: Automated label pool from BKG/HRL/GlobalForestWatch        │
+│  Step B: Manual refinement of ~500–1000 high-confidence polygons    │
+│  Step C: Sample migration across years (Moharrami et al. method)    │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│           FOUNDATION MODEL FINE-TUNING (Prithvi or Clay)           │
-│  • Extract embeddings from pre-trained encoder                     │
-│  • Fine-tune classification head with our labeled data             │
-│  • Multi-temporal input: use seasonal composites 2020–2025         │
+│          4. FOUNDATION MODEL FINE-TUNING (Prithvi or Clay)          │
+│  • Extract embeddings from pre-trained encoder                      │
+│  • Fine-tune classification head with our labeled data              │
+│  • Multi-temporal input: use seasonal composites 2020–2025          │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    CHANGE DETECTION                                  │
-│  • Binary: "Changed" vs. "Unchanged" per pixel, per year           │
-│  • Semantic: Forest → Degraded Forest → Clear-cut / Peatland → Dry │
-│  • Time series analysis: when did the change happen?               │
+│                   5. CHANGE DETECTION                               │
+│  • Binary: "Changed" vs. "Unchanged" per pixel, per year            │
+│  • Semantic: Forest → Degraded Forest → Clear-cut / Peatland → Dry  │
+│  • Time series analysis: when did the change happen?                │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                  ACCURACY ASSESSMENT & REPORTING                    │
-│  • Hold-out test set (stratified, never used in training)          │
-│  • Overall Accuracy, F1-score, Kappa coefficient                   │
-│  • Area estimates with uncertainty bounds (Olofsson method)        │
+│                 6. ACCURACY ASSESSMENT & REPORTING                  │
+│  • Hold-out test set (stratified, never used in training)           │
+│  • Overall Accuracy, F1-score, Kappa coefficient                    │
+│  • Area estimates with uncertainty bounds (Olofsson method)         │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 

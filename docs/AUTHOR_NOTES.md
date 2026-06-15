@@ -164,6 +164,7 @@ Adding mobile support would require a Tailwind responsive prefix pass (`sm:`, `m
 - **No undo / redo.** Map edits are applied directly to the live FeatureCollection. There is no edit history, so mistakes require re-uploading the original file.
 - **No user authentication.** The API is open — any client with network access can upload and re-analyse files. For a multi-user deployment, authentication (OAuth2, API keys) and per-user isolation would be required.
 - **Property schema is untyped.** Feature properties are arbitrary JSON objects. There is no schema enforcement, no type coercion on table edits (all edits are saved as strings), and no validation that a required field (e.g. `crop_type`, `field_id`) is present.
+- **No CI/CD pipeline.** There are no GitHub Actions workflows, so tests are not run automatically on push or pull request. There is also no commit hygiene tooling — `commitlint` (enforcing Conventional Commits) and `husky` (pre-commit/pre-push hooks for lint and tests) are absent. Adding these would prevent broken code from reaching the main branch and make the commit history machine-readable for automated changelog generation.
 
 ---
 
