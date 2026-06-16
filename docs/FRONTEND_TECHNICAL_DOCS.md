@@ -356,32 +356,37 @@ Cheap single-field projections: `selectDashboard`, `selectTable`, `selectRespons
 
 #### Derived (memoised) Selectors
 
-**`selectDeletedIndices`** — `Set<number>` of original indices that exist in `response.features` but are absent from the live FC (deleted via map editing).
+**`selectPresentOriginalIndices`** *(new internal selector)* — Builds a `Set<number>` of `_originalIndex` values currently present in the live FC. Used by `selectDeletedIndices`.
 
-**`selectAllRows`** — Merges backend `ProcessedFeature` records with live FC metadata into `TableRow[]`. Two categories: deleted rows (in response, not in FC) followed by live rows. Each `TableRow` carries:
+**`selectDeletedIndices`** — `Set<number>` of original indices that exist in `response.features` but are absent from the live FC. Derived by diffing `selectPresentOriginalIndices` against all backend feature indices, so it correctly handles features added after upload.
+
+**`selectAllRows`** — Merges backend `ProcessedFeature` records with live FC metadata into `TableRow[]`. Two categories: deleted rows (staged for removal, shown with a DELETED badge) followed by live rows. Each `TableRow` carries:
 
 ```ts
 interface TableRow {
-  index: number;        // Position in live FC
-  pf: ProcessedFeature | null;  // null for newly-drawn features
+  index: number;               // Live FC array position (>= 0) for live rows;
+                               // -(originalIndex + 1) for deleted rows — never
+                               // collides with a live array position.
+  pf: ProcessedFeature | null; // null for newly-drawn features
+  originalIndex: number | null;// Stable _originalIndex from backend; null for drawn features
   geomType: string;
-  isDrawn: boolean;     // true = drawn after last analysis
-  isDeleted: boolean;   // true = deleted via map edit
-  isEdited: boolean;    // true = properties edited in table
+  isDrawn: boolean;            // true = drawn after last analysis
+  isDeleted: boolean;          // true = deleted via map edit (staged, not yet saved)
+  isEdited: boolean;           // true = properties edited in table
 }
 ```
 
-**`selectFilterCounts`** — `Record<FeatureFilter, number>` for the filter tab badges. Excludes deleted rows from "all" count.
+**`selectFilterCounts`** — `Record<FeatureFilter, number>` for the filter tab badges. Excludes deleted rows from the `"all"` count.
 
 **`selectFilteredRows`** — Applies the active filter tab. Deleted and drawn features only appear under `"all"`.
 
-**`selectSearchedRows`** — Case-insensitive search across feature index, geometry type, and all non-`_` property keys and values.
+**`selectSearchedRows`** — Case-insensitive search across feature index, geometry type, and all non-`_` property keys and values. Deleted rows look up properties from `pf.feature.properties` (backend snapshot) rather than the live FC, since their `index` is a negative sentinel and not a valid array position.
 
 **`selectSortedRows`** — Sorts by `index`, `type` (alphabetical), `valid`, `duplicate`, or `area`.
 
-**`selectTotalFilteredCount`** / **`selectTotalPages`** — Pagination metadata.
+**`selectTotalFilteredCount`** — Counts only live (non-deleted) rows so pagination arithmetic is not inflated by pinned deleted rows.
 
-**`selectPagedRows`** — Final slice of sorted rows for the current page. This is what `FeatureTable` renders.
+**`selectPagedRows`** — Separates deleted rows from live rows before slicing. Deleted rows are prepended to every page so pending deletions remain visible regardless of which page the user is on. Only live rows count toward the page size.
 
 ---
 
@@ -518,10 +523,13 @@ Scrollable `h-[480px]` panel listing geometry issues and duplicate groups.
 ```ts
 interface IssuesPanelProps {
   summary: AnalysisSummary;
+  featureCollection: FeatureCollection | null; // Used to resolve _originalIndex → live FC position
   onSelectFeature: (index: number) => void;
   onApplyFix?: (issue: GeometryIssue) => void;
 }
 ```
+
+The internal `resolveLiveIndex(fc, originalIndex)` helper translates a backend `_originalIndex` (from `issue.feature_index` or `group.feature_indices`) into the current live FC array position before calling `onSelectFeature`. This ensures that after a deletion shifts array positions, clicking an issue chip or duplicate chip still navigates to the correct feature. The chip label continues to display the original backend index for consistency with the analysis report.'''
 
 ### 8.8 FeatureTable
 
