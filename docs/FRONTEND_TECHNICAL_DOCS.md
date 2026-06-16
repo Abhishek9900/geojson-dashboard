@@ -585,14 +585,14 @@ Subscribed components re-render with new derived data
 
 **Feature index lifetime:**
 
-A `_originalIndex` stamp is applied to each feature in the live `FeatureCollection` when a backend response is processed (`buildStampedFC`). This stamp is the stable link between:
+A `_originalIndex` stamp is applied to each feature in the live `FeatureCollection` when a backend response is processed (`buildStampedFC`). This stamp is the **stable identity key** across the entire app:
 
-- A row in `FeatureTable`
-- A map feature in `MapView`
-- An issue in `IssuesPanel`
-- A `ProcessedFeature` in `response.features`
+- `FeatureTable` — `TableRow.originalIndex` is used for property lookups on deleted rows; `TableRow.index` (live FC array position) is only used for live rows.
+- `MapView` — `handleDeleteSelected` identifies the target feature by `_originalIndex` before filtering, so sequential deletions do not shift positions and remove the wrong feature.
+- `IssuesPanel` — `resolveLiveIndex` translates backend `_originalIndex` values in issue/duplicate chips back to the current live FC array position before calling `onSelectFeature`.
+- `selectDeletedIndices` — diffs the set of `_originalIndex` values present in the live FC against all backend feature indices to determine which features have been staged for deletion.
 
-Newly drawn features have no `_originalIndex`. Deleted features retain their original index in the `deletedIndices` set.
+Newly drawn features have no `_originalIndex`. Deleted features retain their original index in `selectDeletedIndices` and remain visible in the table with a DELETED badge until the user saves and re-analyses.'''
 
 ---
 
