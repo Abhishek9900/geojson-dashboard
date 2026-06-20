@@ -2,21 +2,21 @@
  * Async thunks for dashboard API calls.
  *
  * Kept separate from dashboardSlice so the slice itself stays a pure reducer
- * with no side-effects.  Each thunk dispatches the relevant slice actions and
+ * with no side-effects. Each thunk dispatches the relevant slice actions and
  * fires a toast notification so the UI stays reactive.
  */
 
 import toast from "react-hot-toast";
 import type { AppThunk } from "./store";
-import { uploadGeoJSON, updateGeoJSON } from "@/lib/api";
+import { uploadGeoJSON, saveFeatureCollection } from "@/lib/api";
 import {
   uploadStarted,
   uploadProgressUpdated,
   uploadSucceeded,
   uploadFailed,
-  analyseStarted,
-  analyseSucceeded,
-  analyseFailed,
+  saveStarted,
+  saveSucceeded,
+  saveFailed,
 } from "./dashboardSlice";
 
 /**
@@ -31,9 +31,7 @@ export function uploadFile(file: File): AppThunk {
     dispatch(uploadStarted());
 
     try {
-      const result = await uploadGeoJSON(file, (pct) =>
-        dispatch(uploadProgressUpdated(pct))
-      );
+      const result = await uploadGeoJSON(file, (pct) => dispatch(uploadProgressUpdated(pct)));
 
       dispatch(uploadSucceeded(result));
 
@@ -55,27 +53,26 @@ export function uploadFile(file: File): AppThunk {
  * Submit the current (possibly edited) FeatureCollection to the backend for
  * a full re-analysis and update all dashboard panels with the fresh result.
  */
-export function analyseCurrentFC(): AppThunk {
+export function saveChanges(): AppThunk {
   return async (dispatch, getState) => {
-    const { dashboard } = getState();
-    const fc = dashboard.pendingFC ?? dashboard.featureCollection;
-    if (!fc) return;
+    const { featureCollection } = getState().dashboard;
+    if (!featureCollection) return;
 
-    dispatch(analyseStarted());
+    dispatch(saveStarted());
 
     try {
-      const result = await updateGeoJSON(fc);
-      dispatch(analyseSucceeded(result));
+      const result = await saveFeatureCollection(featureCollection);
+      dispatch(saveSucceeded(result));
 
       const { summary } = result;
       toast.success(
-        `Analysis complete — ${summary.total_features} features, ` +
+        `Saved — ${summary.total_features} features, ` +
           `${summary.invalid_features} issues, ` +
           `${summary.duplicate_groups} duplicate groups`
       );
     } catch (err) {
-      dispatch(analyseFailed());
-      toast.error(err instanceof Error ? err.message : "Analysis failed");
+      dispatch(saveFailed());
+      toast.error(err instanceof Error ? err.message : "Save failed");
     }
   };
 }

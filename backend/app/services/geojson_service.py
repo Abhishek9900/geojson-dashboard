@@ -11,11 +11,12 @@ Responsible for:
 
 import hashlib
 import json
-from typing import Dict, List, Optional, Tuple
 
 from loguru import logger
 from shapely.geometry import mapping, shape
-from shapely.ops import unary_union  # noqa: F401 — available for future near-dup detection
+from shapely.ops import (
+    unary_union,  # noqa: F401 — available for future near-dup detection
+)
 from shapely.validation import explain_validity, make_valid
 
 from app.models.geojson_models import (
@@ -48,7 +49,7 @@ class GeoJSONProcessingService:
     def process_feature_collection(
         self,
         feature_collection: FeatureCollectionModel,
-    ) -> Tuple[List[ProcessedFeature], AnalysisSummary]:
+    ) -> tuple[list[ProcessedFeature], AnalysisSummary]:
         """
         Validate, enrich, and summarise all features in a FeatureCollection.
 
@@ -66,9 +67,9 @@ class GeoJSONProcessingService:
         n = len(feature_collection.features)
         logger.info(f"Processing {n} features")
 
-        processed: List[ProcessedFeature] = []
-        issues: List[GeometryIssue] = []
-        geometry_type_counts: Dict[str, int] = {}
+        processed: list[ProcessedFeature] = []
+        issues: list[GeometryIssue] = []
+        geometry_type_counts: dict[str, int] = {}
 
         # Step 1 — per-feature validation.
         for idx, feature in enumerate(feature_collection.features):
@@ -77,9 +78,7 @@ class GeoJSONProcessingService:
             issues.extend(geom_issues)
 
             geom_type = feature.geometry.type if feature.geometry else "null"
-            geometry_type_counts[geom_type] = (
-                geometry_type_counts.get(geom_type, 0) + 1
-            )
+            geometry_type_counts[geom_type] = geometry_type_counts.get(geom_type, 0) + 1
 
         # Step 2 — duplicate detection.
         duplicate_groups = self._detect_duplicates(processed)
@@ -87,9 +86,7 @@ class GeoJSONProcessingService:
 
         # Step 3 — aggregate summary.
         valid_count = sum(1 for pf in processed if pf.is_valid)
-        total_duplicates = sum(
-            len(g.feature_indices) - 1 for g in duplicate_groups
-        )
+        total_duplicates = sum(len(g.feature_indices) - 1 for g in duplicate_groups)
 
         summary = AnalysisSummary(
             total_features=len(processed),
@@ -112,7 +109,7 @@ class GeoJSONProcessingService:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _feature_id(self, feature: FeatureModel) -> Optional[str | int]:
+    def _feature_id(self, feature: FeatureModel) -> str | int | None:
         """Extract a displayable id from a feature (``id`` field or ``fid`` property)."""
         return feature.id or (
             feature.properties.get("fid") if feature.properties else None
@@ -122,7 +119,7 @@ class GeoJSONProcessingService:
         self,
         idx: int,
         feature: FeatureModel,
-    ) -> Tuple[ProcessedFeature, List[GeometryIssue]]:
+    ) -> tuple[ProcessedFeature, list[GeometryIssue]]:
         """
         Validate a single feature and compute area / centroid metrics.
 
@@ -134,11 +131,11 @@ class GeoJSONProcessingService:
             A ``(ProcessedFeature, issues)`` pair.  Issues are also embedded
             in the ProcessedFeature for quick access.
         """
-        issues: List[GeometryIssue] = []
-        issue_labels: List[str] = []
+        issues: list[GeometryIssue] = []
+        issue_labels: list[str] = []
         is_valid = True
-        area_m2: Optional[float] = None
-        centroid: Optional[Dict[str, float]] = None
+        area_m2: float | None = None
+        centroid: dict[str, float] | None = None
         feature_id = self._feature_id(feature)
 
         if feature.geometry is None:
@@ -156,9 +153,7 @@ class GeoJSONProcessingService:
 
         else:
             try:
-                shapely_geom = shape(
-                    feature.geometry.model_dump(exclude_none=True)
-                )
+                shapely_geom = shape(feature.geometry.model_dump(exclude_none=True))
 
                 if shapely_geom.is_empty:
                     issues.append(
@@ -225,7 +220,7 @@ class GeoJSONProcessingService:
             issues,
         )
 
-    def _geometry_hash(self, feature: FeatureModel) -> Optional[str]:
+    def _geometry_hash(self, feature: FeatureModel) -> str | None:
         """
         Produce a deterministic SHA-256 hash of a feature's geometry coordinates.
 
@@ -247,8 +242,8 @@ class GeoJSONProcessingService:
 
     def _detect_duplicates(
         self,
-        processed: List[ProcessedFeature],
-    ) -> List[DuplicateGroup]:
+        processed: list[ProcessedFeature],
+    ) -> list[DuplicateGroup]:
         """
         Group features that share an identical geometry hash.
 
@@ -261,19 +256,17 @@ class GeoJSONProcessingService:
             A list of ``DuplicateGroup`` objects, one per group.
         """
         # Map geometry hash → list of feature indices.
-        hash_map: Dict[str, List[int]] = {}
+        hash_map: dict[str, list[int]] = {}
         for pf in processed:
             h = self._geometry_hash(pf.feature)
             if h is not None:
                 hash_map.setdefault(h, []).append(pf.index)
 
-        groups: List[DuplicateGroup] = []
+        groups: list[DuplicateGroup] = []
         for group_id, indices in enumerate(
             indices for indices in hash_map.values() if len(indices) >= 2
         ):
-            feature_ids = [
-                self._feature_id(processed[i].feature) for i in indices
-            ]
+            feature_ids = [self._feature_id(processed[i].feature) for i in indices]
             groups.append(
                 DuplicateGroup(
                     group_id=group_id,
@@ -291,8 +284,8 @@ class GeoJSONProcessingService:
 
     def _mark_duplicates(
         self,
-        processed: List[ProcessedFeature],
-        groups: List[DuplicateGroup],
+        processed: list[ProcessedFeature],
+        groups: list[DuplicateGroup],
     ) -> None:
         """
         Flag duplicate features in-place.

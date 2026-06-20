@@ -11,7 +11,7 @@
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
   selectHasData,
-  selectHasPending,
+  selectHasUnsavedChanges,
   selectIsSaving,
   selectFilename,
   selectResponse,
@@ -28,7 +28,7 @@ import {
   featureSelected,
   resetDashboard,
 } from "@/store/dashboardSlice";
-import { uploadFile, analyseCurrentFC } from "@/store/dashboardThunks";
+import { uploadFile, saveChanges } from "@/store/dashboardThunks";
 import { downloadGeoJSON } from "@/lib/geojson-utils";
 import type { GeometryIssue } from "@/types";
 import type { FeatureCollection } from "geojson";
@@ -46,7 +46,7 @@ export default function DashboardPage() {
 
   // Selectors — each component only re-renders when its slice changes.
   const hasData = useAppSelector(selectHasData);
-  const hasPending = useAppSelector(selectHasPending);
+  const hasUnsavedChanges = useAppSelector(selectHasUnsavedChanges);
   const isSaving = useAppSelector(selectIsSaving);
   const filename = useAppSelector(selectFilename);
   const response = useAppSelector(selectResponse);
@@ -64,25 +64,24 @@ export default function DashboardPage() {
 
   function handleMapSave(updatedFC: FeatureCollection) {
     dispatch(mapEditStaged(updatedFC));
-    toast.success("Edits staged — click Save to run analysis again.", {
+    toast.success("Edits staged — click Save to apply them.", {
       duration: 4000,
     });
   }
 
   function handleApplyFix(issue: GeometryIssue) {
     dispatch(geometryFixApplied(issue));
-    toast.success(
-      `Fix applied to feature #${issue.feature_index} — save & analyse to confirm.`,
-      { icon: "🔧" }
-    );
+    toast.success(`Fix applied to feature #${issue.feature_index} — click Save to confirm.`, {
+      icon: "🔧",
+    });
   }
 
   function handleUpdateProperties(index: number, props: Record<string, string>) {
     dispatch(propertiesUpdated({ index, props }));
   }
 
-  function handleAnalyse() {
-    dispatch(analyseCurrentFC());
+  function handleSave() {
+    dispatch(saveChanges());
   }
 
   function handleDownload() {
@@ -104,17 +103,17 @@ export default function DashboardPage() {
   // ---- render ----
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex min-h-screen flex-col">
       <Header
         filename={filename}
         onReset={handleReset}
         onDownload={hasData ? handleDownload : undefined}
-        onAnalyse={hasData ? handleAnalyse : undefined}
-        hasPending={hasPending}
+        onSave={hasData ? handleSave : undefined}
+        hasUnsavedChanges={hasUnsavedChanges}
         isSaving={isSaving}
       />
 
-      <main className="flex-1 p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto w-full">
+      <main className="mx-auto w-full max-w-[1600px] flex-1 space-y-6 p-4 md:p-6">
         {!hasData && (
           <UploadZone
             onUpload={handleUpload}
@@ -128,8 +127,8 @@ export default function DashboardPage() {
           <>
             <SummaryCards summary={response.summary} />
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-              <div className="xl:col-span-2 rounded-xl overflow-hidden border border-slate-700 h-[480px]">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <div className="h-[480px] overflow-hidden rounded-xl border border-slate-700 xl:col-span-2">
                 <MapView
                   featureCollection={featureCollection}
                   processedFeatures={response.features}

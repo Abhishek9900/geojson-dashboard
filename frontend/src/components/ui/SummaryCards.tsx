@@ -44,16 +44,13 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {cards.map(({ label, value, icon: Icon, color, bg }) => (
-        <div
-          key={label}
-          className={`rounded-xl border p-4 flex items-center gap-3 ${bg}`}
-        >
-          <Icon className={`w-5 h-5 flex-shrink-0 ${color}`} />
+        <div key={label} className={`flex items-center gap-3 rounded-xl border p-4 ${bg}`}>
+          <Icon className={`h-5 w-5 flex-shrink-0 ${color}`} />
           <div>
-            <p className="text-2xl font-bold leading-none">{value}</p>
-            <p className="text-xs text-slate-400 mt-1">{label}</p>
+            <p className="text-2xl leading-none font-bold">{value}</p>
+            <p className="mt-1 text-xs text-slate-400">{label}</p>
           </div>
         </div>
       ))}

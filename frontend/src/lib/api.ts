@@ -96,14 +96,14 @@ export async function uploadGeoJSON(
 /**
  * Submit an edited FeatureCollection for re-validation and analysis.
  *
- * Called when the user clicks *Save & Analyse* in the dashboard header.
+ * Called when the user clicks *Save* in the dashboard header.
  * The response shape is identical to {@link uploadGeoJSON} so the frontend
  * can refresh all panels with the same code path.
  */
-export async function updateGeoJSON(
+export async function saveFeatureCollection(
   featureCollection: FeatureCollection
 ): Promise<ProcessGeoJSONResponse> {
-  const response = await fetch(`${BASE_URL}/api/geojson/update`, {
+  const response = await fetch(`${BASE_URL}/api/geojson/save`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ feature_collection: featureCollection }),

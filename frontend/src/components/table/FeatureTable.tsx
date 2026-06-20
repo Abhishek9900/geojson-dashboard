@@ -107,9 +107,9 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
   function SortIcon({ column }: { column: SortKey }) {
     if (sortKey !== column) return null;
     return sortDir === "asc" ? (
-      <ChevronUp className="w-3 h-3" />
+      <ChevronUp className="h-3 w-3" />
     ) : (
-      <ChevronDown className="w-3 h-3" />
+      <ChevronDown className="h-3 w-3" />
     );
   }
 
@@ -117,9 +117,7 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
 
   function startEdit(row: TableRow) {
     const rawProps =
-      featureCollection?.features[row.index]?.properties ??
-      row.pf?.feature.properties ??
-      {};
+      featureCollection?.features[row.index]?.properties ?? row.pf?.feature.properties ?? {};
     const props: Record<string, string> = {};
     Object.entries(rawProps).forEach(([k, v]) => {
       if (!k.startsWith("_")) props[k] = String(v ?? "");
@@ -153,50 +151,48 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
   const pageEnd = Math.min(currentPage * pageSize, totalFiltered);
 
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-900 overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900">
       {/* ---------------------------------------------------------------- */}
       {/* Toolbar: filter tabs + search + page size                        */}
       {/* ---------------------------------------------------------------- */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 gap-3 flex-wrap">
-        <h2 className="text-sm font-semibold shrink-0">Feature Table</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 px-4 py-3">
+        <h2 className="shrink-0 text-sm font-semibold">Feature Table</h2>
 
         {/* Filter tabs */}
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex flex-wrap gap-1">
           {(Object.keys(FILTER_LABELS) as FeatureFilter[]).map((f) => (
             <button
               key={f}
               onClick={() => dispatch(filterChanged(f))}
               className={[
-                "text-xs px-3 py-1 rounded-lg transition-colors font-medium",
+                "rounded-lg px-3 py-1 text-xs font-medium transition-colors",
                 filter === f
                   ? "bg-green-600 text-white"
                   : "bg-slate-800 text-slate-400 hover:text-slate-200",
               ].join(" ")}
             >
               {FILTER_LABELS[f]}
-              <span className="ml-1.5 text-[10px] opacity-70">
-                ({filterCounts[f]})
-              </span>
+              <span className="ml-1.5 text-[10px] opacity-70">({filterCounts[f]})</span>
             </button>
           ))}
         </div>
 
         {/* Search */}
-        <div className="relative flex-1 min-w-[180px] max-w-[320px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+        <div className="relative max-w-[320px] min-w-[180px] flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
             placeholder="Search properties, type, index…"
             value={searchQuery}
             onChange={(e) => dispatch(searchQueryChanged(e.target.value))}
-            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-green-500 transition-colors"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 py-1.5 pr-3 pl-8 text-xs text-slate-200 transition-colors placeholder:text-slate-600 focus:border-green-500 focus:outline-none"
           />
           {searchQuery && (
             <button
               onClick={() => dispatch(searchQueryChanged(""))}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              className="absolute top-1/2 right-2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
             >
-              <X className="w-3 h-3" />
+              <X className="h-3 w-3" />
             </button>
           )}
         </div>
@@ -205,7 +201,7 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
         <select
           value={pageSize}
           onChange={(e) => dispatch(pageSizeChanged(Number(e.target.value)))}
-          className="text-xs bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-300 focus:outline-none focus:border-green-500 transition-colors"
+          className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-300 transition-colors focus:border-green-500 focus:outline-none"
           aria-label="Rows per page"
         >
           {PAGE_SIZE_OPTIONS.map((n) => (
@@ -222,7 +218,7 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="text-slate-400 border-b border-slate-700">
+            <tr className="border-b border-slate-700 text-slate-400">
               {(
                 [
                   { key: "index" as SortKey, label: "#" },
@@ -234,7 +230,7 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
               ).map(({ key, label }) => (
                 <th
                   key={key}
-                  className="text-left px-4 py-2 cursor-pointer hover:text-slate-200 transition-colors select-none"
+                  className="cursor-pointer px-4 py-2 text-left transition-colors select-none hover:text-slate-200"
                   onClick={() => handleSortClick(key)}
                 >
                   <span className="inline-flex items-center gap-1">
@@ -243,20 +239,15 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
                   </span>
                 </th>
               ))}
-              <th className="text-left px-4 py-2">Properties</th>
-              <th className="text-left px-4 py-2">Issues</th>
-              {onUpdateProperties && (
-                <th className="text-left px-4 py-2 w-10" />
-              )}
+              <th className="px-4 py-2 text-left">Properties</th>
+              <th className="px-4 py-2 text-left">Issues</th>
+              {onUpdateProperties && <th className="w-10 px-4 py-2 text-left" />}
             </tr>
           </thead>
           <tbody>
             {pagedRows.length === 0 && (
               <tr>
-                <td
-                  colSpan={8}
-                  className="px-4 py-8 text-center text-slate-500"
-                >
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   {searchQuery
                     ? `No features match "${searchQuery}".`
                     : "No features match this filter."}
@@ -269,25 +260,23 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
               const isEditing = editingIndex === index;
 
               const rawProps = row.isDeleted
-                ? pf?.feature.properties ?? {}
-                : featureCollection?.features[index]?.properties ?? pf?.feature.properties ?? {};
-              const displayProps = Object.entries(rawProps).filter(
-                ([k]) => !k.startsWith("_")
-              );
+                ? (pf?.feature.properties ?? {})
+                : (featureCollection?.features[index]?.properties ?? pf?.feature.properties ?? {});
+              const displayProps = Object.entries(rawProps).filter(([k]) => !k.startsWith("_"));
 
               return (
                 <tr
                   key={index}
                   onClick={() => !isEditing && onSelectFeature(index)}
                   className={[
-                    "border-b border-slate-800 cursor-pointer transition-colors",
+                    "cursor-pointer border-b border-slate-800 transition-colors",
                     isSelected
-                      ? "bg-amber-500/10 border-amber-500/20"
+                      ? "border-amber-500/20 bg-amber-500/10"
                       : row.isDeleted
-                      ? "bg-red-500/5 border-red-500/10"
-                      : row.isEdited
-                      ? "bg-blue-500/5 border-blue-500/10"
-                      : "hover:bg-slate-800/60",
+                        ? "border-red-500/10 bg-red-500/5"
+                        : row.isEdited
+                          ? "border-blue-500/10 bg-blue-500/5"
+                          : "hover:bg-slate-800/60",
                     row.isDeleted ? "opacity-60" : "",
                     pf?.is_duplicate ? "opacity-75" : "",
                   ].join(" ")}
@@ -297,17 +286,17 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
                     <span className="flex items-center gap-1.5">
                       {index}
                       {isDrawn && (
-                        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded px-1 py-px text-[9px] font-semibold">
+                        <span className="rounded border border-amber-500/30 bg-amber-500/20 px-1 py-px text-[9px] font-semibold text-amber-300">
                           NEW
                         </span>
                       )}
                       {row.isDeleted && (
-                        <span className="bg-red-500/20 text-red-300 border border-red-500/30 rounded px-1 py-px text-[9px] font-semibold">
+                        <span className="rounded border border-red-500/30 bg-red-500/20 px-1 py-px text-[9px] font-semibold text-red-300">
                           DELETED
                         </span>
                       )}
                       {row.isEdited && (
-                        <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded px-1 py-px text-[9px] font-semibold">
+                        <span className="rounded border border-blue-500/30 bg-blue-500/20 px-1 py-px text-[9px] font-semibold text-blue-300">
                           EDITED
                         </span>
                       )}
@@ -315,18 +304,16 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
                   </td>
 
                   {/* Geometry type */}
-                  <td className="px-4 py-2.5 font-mono text-slate-300">
-                    {row.geomType}
-                  </td>
+                  <td className="px-4 py-2.5 font-mono text-slate-300">{row.geomType}</td>
 
                   {/* Valid */}
                   <td className="px-4 py-2.5">
                     {isDrawn ? (
-                      <span className="text-slate-500 text-[10px]">pending</span>
+                      <span className="text-[10px] text-slate-500">pending</span>
                     ) : pf?.is_valid ? (
-                      <CheckCircle className="w-4 h-4 text-green-400" />
+                      <CheckCircle className="h-4 w-4 text-green-400" />
                     ) : (
-                      <XCircle className="w-4 h-4 text-red-400" />
+                      <XCircle className="h-4 w-4 text-red-400" />
                     )}
                   </td>
 
@@ -334,7 +321,7 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
                   <td className="px-4 py-2.5">
                     {pf?.is_duplicate ? (
                       <span className="inline-flex items-center gap-1 text-purple-300">
-                        <Copy className="w-3 h-3" />
+                        <Copy className="h-3 w-3" />
                         Group {pf.duplicate_group_id}
                       </span>
                     ) : (
@@ -344,21 +331,16 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
 
                   {/* Area */}
                   <td className="px-4 py-2.5 font-mono text-slate-400">
-                    {pf?.area_m2 != null
-                      ? `~${pf.area_m2.toLocaleString()} m²`
-                      : "—"}
+                    {pf?.area_m2 != null ? `~${pf.area_m2.toLocaleString()} m²` : "—"}
                   </td>
 
                   {/* Properties */}
-                  <td className="px-4 py-2.5 max-w-[300px]">
+                  <td className="max-w-[300px] px-4 py-2.5">
                     {isEditing ? (
-                      <div
-                        className="space-y-1.5"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
                         {Object.entries(editProps).map(([k, v]) => (
                           <div key={k} className="flex items-center gap-1">
-                            <span className="text-slate-500 font-mono text-[10px] w-20 shrink-0 truncate">
+                            <span className="w-20 shrink-0 truncate font-mono text-[10px] text-slate-500">
                               {k}:
                             </span>
                             <input
@@ -370,7 +352,7 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
                                   [k]: e.target.value,
                                 }))
                               }
-                              className="flex-1 bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-[11px] text-slate-200 focus:outline-none focus:border-green-500 min-w-0"
+                              className="min-w-0 flex-1 rounded border border-slate-600 bg-slate-900 px-1.5 py-0.5 text-[11px] text-slate-200 focus:border-green-500 focus:outline-none"
                             />
                             <button
                               onClick={() =>
@@ -380,21 +362,21 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
                                   return n;
                                 })
                               }
-                              className="text-red-400 hover:text-red-300 transition-colors"
+                              className="text-red-400 transition-colors hover:text-red-300"
                               title="Remove property"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="h-3 w-3" />
                             </button>
                           </div>
                         ))}
                         {/* Add new property */}
-                        <div className="flex items-center gap-1 pt-1 border-t border-slate-700">
+                        <div className="flex items-center gap-1 border-t border-slate-700 pt-1">
                           <input
                             type="text"
                             placeholder="key"
                             value={newPropKey}
                             onChange={(e) => setNewPropKey(e.target.value)}
-                            className="w-16 bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-green-500 font-mono"
+                            className="w-16 rounded border border-slate-600 bg-slate-900 px-1.5 py-0.5 font-mono text-[10px] text-slate-300 focus:border-green-500 focus:outline-none"
                           />
                           <input
                             type="text"
@@ -402,11 +384,11 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
                             value={newPropValue}
                             onChange={(e) => setNewPropValue(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && addNewProp()}
-                            className="flex-1 bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-green-500 min-w-0"
+                            className="min-w-0 flex-1 rounded border border-slate-600 bg-slate-900 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-green-500 focus:outline-none"
                           />
                           <button
                             onClick={addNewProp}
-                            className="text-green-400 hover:text-green-300 text-xs px-1"
+                            className="px-1 text-xs text-green-400 hover:text-green-300"
                             title="Add property"
                           >
                             +
@@ -418,19 +400,17 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
                         {displayProps.slice(0, 4).map(([k, v]) => (
                           <span
                             key={k}
-                            className="bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] truncate max-w-[150px]"
+                            className="max-w-[150px] truncate rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px]"
                           >
                             <span className="text-slate-500">{k}: </span>
                             <span className="text-slate-300">{String(v)}</span>
                           </span>
                         ))}
                         {displayProps.length === 0 && (
-                          <span className="text-slate-600 text-[10px]">
-                            no properties
-                          </span>
+                          <span className="text-[10px] text-slate-600">no properties</span>
                         )}
                         {displayProps.length > 4 && (
-                          <span className="text-slate-500 text-[10px]">
+                          <span className="text-[10px] text-slate-500">
                             +{displayProps.length - 4} more
                           </span>
                         )}
@@ -441,7 +421,7 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
                   {/* Issues */}
                   <td className="px-4 py-2.5">
                     {pf && pf.issues.length > 0 ? (
-                      <span className="text-red-300 text-[10px] leading-relaxed">
+                      <span className="text-[10px] leading-relaxed text-red-300">
                         {pf.issues.join(", ")}
                       </span>
                     ) : (
@@ -451,35 +431,32 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
 
                   {/* Edit / confirm / cancel */}
                   {onUpdateProperties && (
-                    <td
-                      className="px-2 py-2.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
                       {isEditing ? (
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => commitEdit(index)}
                             title="Save properties"
-                            className="text-green-400 hover:text-green-300 transition-colors"
+                            className="text-green-400 transition-colors hover:text-green-300"
                           >
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={cancelEdit}
                             title="Cancel"
-                            className="text-slate-500 hover:text-slate-300 transition-colors"
+                            className="text-slate-500 transition-colors hover:text-slate-300"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ) : (
                         <button
                           onClick={() => startEdit(row)}
                           title="Edit properties"
-                          className="text-slate-500 hover:text-slate-300 transition-colors"
+                          className="text-slate-500 transition-colors hover:text-slate-300"
                           disabled={row.isDeleted}
                         >
-                          <Pencil className="w-3.5 h-3.5" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </td>
@@ -494,7 +471,7 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
       {/* ---------------------------------------------------------------- */}
       {/* Footer: row count + pagination controls                          */}
       {/* ---------------------------------------------------------------- */}
-      <div className="px-4 py-2.5 border-t border-slate-800 flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800 px-4 py-2.5">
         {/* Row count */}
         <p className="text-xs text-slate-500">
           {totalFiltered === 0 ? (
@@ -505,12 +482,9 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
               <span className="text-slate-300">
                 {pageStart}–{pageEnd}
               </span>{" "}
-              of{" "}
-              <span className="text-slate-300">{totalFiltered}</span> features
+              of <span className="text-slate-300">{totalFiltered}</span> features
               {searchQuery && (
-                <span className="ml-1 text-green-400/70">
-                  matching &ldquo;{searchQuery}&rdquo;
-                </span>
+                <span className="ml-1 text-green-400/70">matching &ldquo;{searchQuery}&rdquo;</span>
               )}
             </>
           )}
@@ -524,23 +498,20 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
               disabled={currentPage === 1}
               title="First page"
             >
-              <ChevronsLeft className="w-3.5 h-3.5" />
+              <ChevronsLeft className="h-3.5 w-3.5" />
             </PaginationButton>
             <PaginationButton
               onClick={() => dispatch(pageChanged(currentPage - 1))}
               disabled={currentPage === 1}
               title="Previous page"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronLeft className="h-3.5 w-3.5" />
             </PaginationButton>
 
             {/* Page number pills */}
             {getPagePills(currentPage, totalPages).map((pill, i) =>
               pill === "…" ? (
-                <span
-                  key={`ellipsis-${i}`}
-                  className="px-1 text-slate-600 text-xs select-none"
-                >
+                <span key={`ellipsis-${i}`} className="px-1 text-xs text-slate-600 select-none">
                   …
                 </span>
               ) : (
@@ -548,7 +519,7 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
                   key={pill}
                   onClick={() => dispatch(pageChanged(pill as number))}
                   className={[
-                    "min-w-[28px] h-7 px-1.5 rounded text-xs font-medium transition-colors",
+                    "h-7 min-w-[28px] rounded px-1.5 text-xs font-medium transition-colors",
                     currentPage === pill
                       ? "bg-green-600 text-white"
                       : "bg-slate-800 text-slate-400 hover:text-slate-200",
@@ -564,14 +535,14 @@ export function FeatureTable({ onSelectFeature, onUpdateProperties }: FeatureTab
               disabled={currentPage === totalPages}
               title="Next page"
             >
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </PaginationButton>
             <PaginationButton
               onClick={() => dispatch(pageChanged(totalPages))}
               disabled={currentPage === totalPages}
               title="Last page"
             >
-              <ChevronsRight className="w-3.5 h-3.5" />
+              <ChevronsRight className="h-3.5 w-3.5" />
             </PaginationButton>
           </div>
         )}
@@ -600,7 +571,7 @@ function PaginationButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="w-7 h-7 flex items-center justify-center rounded bg-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      className="flex h-7 w-7 items-center justify-center rounded bg-slate-800 text-slate-400 transition-colors hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
     >
       {children}
     </button>

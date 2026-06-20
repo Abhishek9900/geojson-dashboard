@@ -26,8 +26,7 @@ export const selectUploadProgress = (s: RootState) => s.dashboard.uploadProgress
 export const selectFilename = (s: RootState) => s.dashboard.filename;
 export const selectIsSaving = (s: RootState) => s.dashboard.isSaving;
 export const selectError = (s: RootState) => s.dashboard.error;
-export const selectHasPending = (s: RootState) =>
-  s.dashboard.pendingFC !== null || s.dashboard.hasPending;
+export const selectHasUnsavedChanges = (s: RootState) => s.dashboard.hasUnsavedChanges;
 export const selectHasData = (s: RootState) =>
   s.dashboard.uploadStatus === "success" && s.dashboard.response !== null;
 
@@ -70,8 +69,7 @@ const selectPresentOriginalIndices = createSelector(
 export const selectDeletedIndices = createSelector(
   selectAllProcessedFeatures,
   selectPresentOriginalIndices,
-  (allFeatures, present) =>
-    new Set(allFeatures.map((_, i) => i).filter((i) => !present.has(i)))
+  (allFeatures, present) => new Set(allFeatures.map((_, i) => i).filter((i) => !present.has(i)))
 );
 
 // ---------------------------------------------------------------------------
@@ -121,7 +119,7 @@ export const selectAllRows = createSelector(
     features.forEach((pf, i) => {
       if (deletedIndices.has(i)) {
         rows.push({
-          index: -(i + 1),       // negative sentinel — never collides with live indices
+          index: -(i + 1), // negative sentinel — never collides with live indices
           originalIndex: i,
           pf,
           geomType: pf.feature.geometry?.type ?? "null",
@@ -165,19 +163,16 @@ export const selectFilterCounts = createSelector(
 );
 
 /** Rows after applying the active filter tab. */
-const selectFilteredRows = createSelector(
-  selectAllRows,
-  selectFilter,
-  (rows, filter): TableRow[] =>
-    rows.filter((row) => {
-      if (row.isDeleted) return filter === "all";
-      if (row.isDrawn) return filter === "all";
-      const pf = row.pf!;
-      if (filter === "valid") return pf.is_valid && !pf.is_duplicate;
-      if (filter === "invalid") return !pf.is_valid;
-      if (filter === "duplicate") return pf.is_duplicate;
-      return true; // "all"
-    })
+const selectFilteredRows = createSelector(selectAllRows, selectFilter, (rows, filter): TableRow[] =>
+  rows.filter((row) => {
+    if (row.isDeleted) return filter === "all";
+    if (row.isDrawn) return filter === "all";
+    const pf = row.pf!;
+    if (filter === "valid") return pf.is_valid && !pf.is_duplicate;
+    if (filter === "invalid") return !pf.is_valid;
+    if (filter === "duplicate") return pf.is_duplicate;
+    return true; // "all"
+  })
 );
 
 /**
@@ -201,8 +196,8 @@ const selectSearchedRows = createSelector(
 
       // For live rows use the FC array position; for deleted rows use pf props.
       const rawProps = row.isDeleted
-        ? row.pf?.feature.properties ?? {}
-        : fc?.features[row.index]?.properties ?? row.pf?.feature.properties ?? {};
+        ? (row.pf?.feature.properties ?? {})
+        : (fc?.features[row.index]?.properties ?? row.pf?.feature.properties ?? {});
 
       return Object.entries(rawProps).some(
         ([k, v]) =>
@@ -229,11 +224,8 @@ const selectSortedRows = createSelector(
       else if (sortKey === "valid")
         cmp = Number(b.pf?.is_valid ?? true) - Number(a.pf?.is_valid ?? true);
       else if (sortKey === "duplicate")
-        cmp =
-          Number(b.pf?.is_duplicate ?? false) -
-          Number(a.pf?.is_duplicate ?? false);
-      else if (sortKey === "area")
-        cmp = (a.pf?.area_m2 ?? 0) - (b.pf?.area_m2 ?? 0);
+        cmp = Number(b.pf?.is_duplicate ?? false) - Number(a.pf?.is_duplicate ?? false);
+      else if (sortKey === "area") cmp = (a.pf?.area_m2 ?? 0) - (b.pf?.area_m2 ?? 0);
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sorted;

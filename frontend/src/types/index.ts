@@ -3,7 +3,7 @@
  * These mirror the Pydantic models defined in the FastAPI backend.
  */
 
-import type { Feature, FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
+import type { Feature, GeoJsonProperties, Geometry } from "geojson";
 
 // ---------------------------------------------------------------------------
 // API response types
@@ -55,26 +55,11 @@ export interface ProcessGeoJSONResponse {
   features: ProcessedFeature[];
 }
 
-export interface UpdateFeaturesResponse {
-  success: boolean;
-  message: string;
-  updated_collection: FeatureCollection;
-}
-
 // ---------------------------------------------------------------------------
 // UI state types
 // ---------------------------------------------------------------------------
 
 export type UploadStatus = "idle" | "uploading" | "success" | "error";
-
-export interface DashboardState {
-  uploadStatus: UploadStatus;
-  filename: string | null;
-  response: ProcessGeoJSONResponse | null;
-  featureCollection: FeatureCollection | null;
-  selectedFeatureIndex: number | null;
-  error: string | null;
-}
 
 export type FeatureFilter = "all" | "valid" | "invalid" | "duplicate";
 

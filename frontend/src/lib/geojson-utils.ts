@@ -16,10 +16,7 @@ import type { MapViewState } from "@/types";
  * Walk any coordinate array recursively, calling ``visitor`` on each
  * ``[lon, lat]`` leaf pair.
  */
-function walkCoordinates(
-  coords: unknown,
-  visitor: (lon: number, lat: number) => void
-): void {
+function walkCoordinates(coords: unknown, visitor: (lon: number, lat: number) => void): void {
   if (!Array.isArray(coords)) return;
   if (typeof coords[0] === "number") {
     visitor(coords[0] as number, coords[1] as number);

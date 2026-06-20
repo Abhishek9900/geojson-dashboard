@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *.pyo
+.pytest_cache/
+.mypy_cache/
 .venv/
 venv/
 *.egg-info/
@@ -13,6 +15,11 @@ node_modules/
 .next/
 out/
 .npm/
+coverage/
+.eslintcache
+*.tsbuildinfo
+*.swc/
+*swc/
 
 # Env files
 .env
@@ -22,6 +29,7 @@ out/
 # macOS
 .DS_Store
 __MACOSX/
+*.swp
 
 # Logs
 backend/logs/*.log

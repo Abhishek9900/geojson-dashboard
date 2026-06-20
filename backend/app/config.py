@@ -1,7 +1,7 @@
 """
 Application configuration using Pydantic Settings.
 """
-from typing import List
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # CORS
-    allowed_origins: List[str] = [
+    allowed_origins: list[str] = [
         "http://localhost:3000",
         "http://frontend:3000",
     ]

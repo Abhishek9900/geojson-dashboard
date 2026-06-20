@@ -1,717 +1,343 @@
-# GeoJSON Farm Dashboard — Frontend Technical Documentation
+# Frontend Technical Docs
 
-## Table of Contents
+Next.js 16 single-page dashboard for uploading, inspecting, editing, and
+re-validating GeoJSON farm-boundary data against the backend API.
 
-1. [Project Overview](#1-project-overview)
-2. [Tech Stack](#2-tech-stack)
-3. [Directory Structure](#3-directory-structure)
-4. [Type System](#4-type-system)
-5. [API Client (`lib/api.ts`)](#5-api-client)
-6. [GeoJSON Utilities (`lib/geojson-utils.ts`)](#6-geojson-utilities)
-7. [Redux Store](#7-redux-store)
-   - 7.1 [Store Configuration](#71-store-configuration)
-   - 7.2 [Dashboard Slice](#72-dashboard-slice)
-   - 7.3 [Table Slice](#73-table-slice)
-   - 7.4 [Async Thunks](#74-async-thunks)
-   - 7.5 [Selectors](#75-selectors)
-8. [Components](#8-components)
-   - 8.1 [Layout & Providers](#81-layout--providers)
-   - 8.2 [Dashboard Page](#82-dashboard-page)
-   - 8.3 [Header](#83-header)
-   - 8.4 [UploadZone](#84-uploadzone)
-   - 8.5 [SummaryCards](#85-summarycards)
-   - 8.6 [MapView](#86-mapview)
-   - 8.7 [IssuesPanel](#87-issuespanel)
-   - 8.8 [FeatureTable](#88-featuretable)
-9. [State Management Data Flow](#9-state-management-data-flow)
-10. [Testing](#10-testing)
-11. [Configuration Files](#11-configuration-files)
-12. [GeoJSON Architecture Notes](#12-geojson-architecture-notes)
+## Stack
 
----
-
-## 1. Project Overview
-
-The GeoJSON Farm Dashboard is a Next.js 16 single-page application for uploading, validating, visualising, and editing GeoJSON farm boundary data. It communicates with a FastAPI backend that performs geometry validation and duplicate detection.
-
-**Key user flows:**
-
-1. **Upload** — Drag-and-drop or click to upload a `.geojson` file. The file is POSTed to the backend, which returns a full analysis report.
-2. **Inspect** — Summary cards show aggregate counts; the MapView renders features colour-coded by status; the IssuesPanel lists geometry errors and duplicate groups.
-3. **Edit** — Features can be edited on the map (draw tools) or via inline property editing in the FeatureTable. Edits are staged locally.
-4. **Save** — The "Save" button submits the current (possibly edited) FeatureCollection back to the backend for a fresh analysis.
-5. **Download** — The current FeatureCollection (including edits) is serialised to a `.geojson` file and downloaded.
-
----
-
-## 2. Tech Stack
-
-| Concern | Library |
-|---|---|
-| Framework | Next.js 16 (App Router, `"use client"`) |
-| Language | TypeScript 6 |
-| State management | Redux Toolkit 2 (`createSlice`, `createSelector`, thunks) |
-| Map | MapLibre GL 5 via `react-map-gl` 8 |
-| Styling | Tailwind CSS 4 |
-| Drag-and-drop upload | `react-dropzone` 15 |
-| Toast notifications | `react-hot-toast` 2 |
-| Testing | Jest 30 + React Testing Library 16 + `jest-dom` 6 |
-| Linting / formatting | ESLint 9, Prettier 3 |
-| Containerisation | Docker (multi-stage, Node 20 Alpine) |
-
----
-
-## 3. Directory Structure
-
-```
-frontend/
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx          Root layout; wraps children in ReduxProvider + Toaster
-│   │   ├── page.tsx            Main dashboard page (orchestrator component)
-│   │   └── globals.css         Tailwind base styles
-│   ├── components/
-│   │   ├── map/
-│   │   │   └── MapView.tsx     MapLibre GL map with draw tools and feature highlighting
-│   │   ├── table/
-│   │   │   └── FeatureTable.tsx Paginated, searchable, sortable, editable feature table
-│   │   ├── ui/
-│   │   │   ├── Header.tsx      Sticky top bar with brand, filename, and action buttons
-│   │   │   ├── IssuesPanel.tsx Scrollable list of geometry issues and duplicate groups
-│   │   │   └── SummaryCards.tsx Four metric cards (total / valid / invalid / duplicates)
-│   │   └── upload/
-│   │       └── UploadZone.tsx  Drag-and-drop upload zone with progress bar
-│   ├── lib/
-│   │   ├── api.ts              HTTP client for all backend endpoints
-│   │   └── geojson-utils.ts    Pure GeoJSON utility functions
-│   ├── providers/
-│   │   └── ReduxProvider.tsx   Client-side Redux <Provider> wrapper
-│   ├── store/
-│   │   ├── index.ts            Barrel export
-│   │   ├── store.ts            configureStore; exports RootState / AppDispatch / AppThunk
-│   │   ├── hooks.ts            Typed useAppDispatch / useAppSelector
-│   │   ├── dashboardSlice.ts   Upload + analysis + feature-edit state
-│   │   ├── tableSlice.ts       Filter / search / sort / pagination UI state
-│   │   ├── dashboardThunks.ts  uploadFile and analyseCurrentFC thunks
-│   │   └── selectors.ts        Memoised derived-data selectors
-│   ├── types/
-│   │   └── index.ts            Shared TypeScript interfaces (mirrors backend Pydantic models)
-│   └── __mocks__/
-│       └── maplibre-gl.ts      Jest mock for maplibre-gl (no WebGL in jsdom)
-├── __tests__/
-│   └── dashboard.test.tsx      Full test suite
-├── jest.config.ts
-├── next.config.ts
-├── tailwind.config.ts
-├── tsconfig.json
-└── Dockerfile
-```
-
----
-
-## 4. Type System
-
-**File:** `src/types/index.ts`
-
-All types mirror the FastAPI backend's Pydantic models, enabling end-to-end type safety without code generation.
-
-### API Response Types
-
-```ts
-GeometryIssue        // Single geometry problem on one feature
-DuplicateGroup       // Set of features that are exact or near-exact duplicates
-AnalysisSummary      // Aggregate counts + full issues + duplicate group detail
-ProcessedFeature     // One feature annotated with validity, issues, area, centroid
-ProcessGeoJSONResponse  // Top-level upload/update response (filename, size, summary, features)
-UpdateFeaturesResponse  // Legacy update response (kept for compatibility)
-```
-
-### UI State Types
-
-```ts
-UploadStatus = "idle" | "uploading" | "success" | "error"
-DashboardState       // Complete shape of the dashboard Redux slice
-FeatureFilter = "all" | "valid" | "invalid" | "duplicate"
-MapViewState         // { longitude, latitude, zoom }
-```
-
----
-
-## 5. API Client
-
-**File:** `src/lib/api.ts`
-
-All HTTP communication is centralised here. The rest of the application never calls `fetch` or `XMLHttpRequest` directly.
-
-### Configuration
-
-```ts
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-```
-
-Set `NEXT_PUBLIC_API_URL` in `.env.local` to point at a non-default backend.
-
-### Functions
-
-#### `uploadGeoJSON(file, onProgress?)`
-
-```ts
-async function uploadGeoJSON(
-  file: File,
-  onProgress?: (percent: number) => void
-): Promise<ProcessGeoJSONResponse>
-```
-
-POSTs the file as `multipart/form-data` to `/api/geojson/upload`.
-
-- When `onProgress` is provided, uses `XMLHttpRequest` so upload progress events can be forwarded to the Redux store (and rendered in the progress bar).
-- Falls back to `fetch` when no progress callback is needed.
-
-#### `updateGeoJSON(featureCollection)`
-
-```ts
-async function updateGeoJSON(
-  featureCollection: FeatureCollection
-): Promise<ProcessGeoJSONResponse>
-```
-
-POSTs an edited `FeatureCollection` as JSON to `/api/geojson/update`. Returns the same shape as `uploadGeoJSON` so the store can apply the same `analyseSucceeded` action.
-
-#### `checkHealth()`
-
-```ts
-async function checkHealth(): Promise<{ status: string }>
-```
-
-Lightweight `GET /health` liveness check.
-
-### Error Handling
-
-The internal `handleResponse<T>` helper extracts `detail` or `error` fields from FastAPI error bodies and surfaces them as plain `Error` objects. Non-JSON error bodies (e.g. nginx gateway errors) are wrapped as `HTTP <status>`.
-
----
-
-## 6. GeoJSON Utilities
-
-**File:** `src/lib/geojson-utils.ts`
-
-All functions are pure and side-effect-free unless noted. Exported functions:
-
-| Function | Signature | Description |
+| Concern | Library | Version |
 |---|---|---|
-| `computeBBox` | `(fc: FeatureCollection) => BBox \| null` | Walks all coordinates to return `[minLon, minLat, maxLon, maxLat]`. Returns `null` for empty or null-geometry collections. |
-| `computeFeatureBBox` | `(feature: Feature<Geometry>) => BBox \| null` | Delegates to `computeBBox` with a single-feature collection. |
-| `getInitialViewState` | `(fc: FeatureCollection) => MapViewState` | Returns a `{longitude, latitude, zoom}` centred on the data's bounding box, or `{0, 20, 2}` as a world-view fallback. |
-| `downloadGeoJSON` | `(fc: FeatureCollection, filename: string) => void` | **Side-effect.** Creates an object URL, triggers a browser download, then immediately revokes the URL. Ensures `.geojson` extension. |
-| `formatBytes` | `(bytes: number) => string` | Human-readable byte size: `"512 B"`, `"1.5 KB"`, `"2.50 MB"`. |
-| `getFeatureColor` | `(isValid, isDuplicate, isSelected) => string` | Returns a hex colour string. Priority: selected (amber) > duplicate (violet) > invalid (red) > valid (green). |
-| `isGeometry` | `(obj: unknown) => obj is Geometry` | Narrow type guard — checks for a non-null object with a `type` field. |
+| Framework | Next.js (App Router) | ^16.2.9 |
+| UI library | React | 19.2.7 |
+| State management | Redux Toolkit | ^2.12.0 |
+| Map rendering | MapLibre GL JS | ^5.24.0 |
+| Styling | Tailwind CSS | — |
+| File upload UI | react-dropzone | ^15.0.0 |
+| Toasts | react-hot-toast | ^2.6.0 |
+| Tests | Jest + Testing Library | — |
+| Lint | ESLint (`eslint-config-next`) | — |
 
-The internal `walkCoordinates` helper recursively walks nested coordinate arrays (supporting all GeoJSON geometry types including `GeometryCollection`) and calls a visitor on each `[lon, lat]` leaf.
+## Directory layout
 
----
-
-## 7. Redux Store
-
-### 7.1 Store Configuration
-
-**File:** `src/store/store.ts`
-
-```ts
-const store = configureStore({
-  reducer: {
-    dashboard: dashboardReducer,
-    table: tableReducer,
-  },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: {
-        ignoredPaths: ["dashboard.featureCollection", "dashboard.pendingFC", "dashboard.response"],
-      },
-    }),
-});
+```
+frontend/src/
+├── app/
+│   ├── layout.tsx           # Root layout — wraps app in ReduxProvider, Toaster
+│   ├── page.tsx             # Main dashboard page — the only route
+│   └── globals.css
+├── components/
+│   ├── upload/UploadZone.tsx     # Drag-and-drop / click-to-upload, progress bar
+│   ├── map/MapView.tsx           # MapLibre map, draw/delete/edit tools
+│   ├── table/FeatureTable.tsx    # Paginated/searchable/sortable feature list
+│   └── ui/
+│       ├── Header.tsx            # Top bar: filename, Save, Download, New File
+│       ├── SummaryCards.tsx      # Aggregate count cards
+│       └── IssuesPanel.tsx       # Geometry issues + duplicate groups, auto-fix
+├── store/
+│   ├── store.ts              # configureStore, AppThunk type
+│   ├── index.ts              # Barrel export
+│   ├── hooks.ts              # Typed useAppDispatch / useAppSelector
+│   ├── dashboardSlice.ts     # Data state: upload, response, live FeatureCollection
+│   ├── tableSlice.ts         # UI-only state: filter, search, sort, pagination
+│   ├── dashboardThunks.ts    # Async actions: uploadFile, saveChanges
+│   └── selectors.ts          # All derived/memoised selectors
+├── lib/
+│   ├── api.ts                # fetch/XHR wrappers for the backend
+│   └── geojson-utils.ts      # Pure helpers: bbox, download, formatting, colour
+├── types/index.ts            # Shared types mirroring backend Pydantic models
+├── providers/ReduxProvider.tsx
+└── __tests__/dashboard.test.tsx   # Full suite: utils, slices, selectors, components
 ```
 
-The serialisability check is relaxed for `featureCollection`, `pendingFC`, and `response` because large `FeatureCollection` objects with complex coordinate arrays would trigger false positives.
+## Architecture overview
 
-**Exported types:**
-
-- `RootState` — inferred from `store.getState`
-- `AppDispatch` — inferred from `store.dispatch`
-- `AppThunk<ReturnType = void>` — typed thunk action creator type
-
-### 7.2 Dashboard Slice
-
-**File:** `src/store/dashboardSlice.ts`
-
-Owns all state related to the loaded file and its analysis.
-
-#### State Shape (`DashboardState`)
-
-| Field | Type | Description |
-|---|---|---|
-| `uploadStatus` | `UploadStatus` | `"idle" \| "uploading" \| "success" \| "error"` |
-| `uploadProgress` | `number` | 0–100 upload percentage |
-| `filename` | `string \| null` | Name of the loaded file |
-| `fileSizeBytes` | `number \| null` | Raw file size |
-| `response` | `ProcessGeoJSONResponse \| null` | Last backend analysis result |
-| `featureCollection` | `FeatureCollection \| null` | Live FC shown on map/table (may differ from `response` after edits) |
-| `pendingFC` | `FeatureCollection \| null` | Staged FC awaiting re-analysis; non-null shows the Save button |
-| `selectedFeatureIndex` | `number \| null` | Map ↔ table ↔ issues panel sync |
-| `isSaving` | `boolean` | True while the re-analysis API call is in flight |
-| `hasPending` | `boolean` | True after inline property edits (supplements `pendingFC` check) |
-| `error` | `string \| null` | Last upload error message |
-
-#### Reducers
-
-| Action | Payload | Effect |
-|---|---|---|
-| `uploadStarted` | — | Sets status to `"uploading"`, clears error |
-| `uploadProgressUpdated` | `number` | Updates `uploadProgress` |
-| `uploadSucceeded` | `ProcessGeoJSONResponse` | Stores response, builds stamped FC, clears pending state |
-| `uploadFailed` | `string` | Sets status to `"error"`, stores message |
-| `mapEditStaged` | `FeatureCollection` | Applies optimistic patch: removes issues/duplicates for deleted features, stages FC |
-| `geometryFixApplied` | `GeometryIssue` | Patches feature geometry in live FC, marks feature valid, removes issue from summary |
-| `propertiesUpdated` | `{ index, props }` | Merges new property values into the feature (preserving `_` internal keys), sets `hasPending` |
-| `analyseStarted` | — | Sets `isSaving = true` |
-| `analyseSucceeded` | `ProcessGeoJSONResponse` | Replaces response + FC, clears pending state |
-| `analyseFailed` | — | Sets `isSaving = false` |
-| `featureSelected` | `number \| null` | Updates `selectedFeatureIndex` |
-| `resetDashboard` | — | Returns to `initialState` |
-
-#### `buildStampedFC` (internal helper)
-
-Converts a `ProcessGeoJSONResponse` into a `FeatureCollection` where each feature gets a `properties._originalIndex` stamp. This stamp is used throughout the app to correlate live FC features with their backend `ProcessedFeature` records, even after map edits that add, remove, or reorder features.
-
-### 7.3 Table Slice
-
-**File:** `src/store/tableSlice.ts`
-
-Owns all UI state for `FeatureTable` that is independent of loaded data.
-
-#### State Shape (`TableState`)
-
-| Field | Type | Default |
-|---|---|---|
-| `filter` | `FeatureFilter` | `"all"` |
-| `searchQuery` | `string` | `""` |
-| `sortKey` | `SortKey` | `"index"` |
-| `sortDir` | `SortDir` | `"asc"` |
-| `currentPage` | `number` | `1` |
-| `pageSize` | `number` | `50` |
-
-`SortKey = "index" | "type" | "valid" | "duplicate" | "area"`
-`SortDir = "asc" | "desc"`
-
-#### Reducers
-
-| Action | Effect |
-|---|---|
-| `filterChanged` | Updates filter, resets to page 1 |
-| `searchQueryChanged` | Updates search, resets to page 1 |
-| `sortChanged` | Updates sort key + direction, resets to page 1 |
-| `pageChanged` | Jumps to specified page |
-| `pageSizeChanged` | Updates page size, resets to page 1 |
-
-#### Extra Reducers (cross-slice)
-
-- `uploadSucceeded` → reset to `initialState`
-- `analyseSucceeded` → reset page to 1, clear search (preserves filter and page size)
-- `resetDashboard` → reset to `initialState`
-
-### 7.4 Async Thunks
-
-**File:** `src/store/dashboardThunks.ts`
-
-Thunks are separate from the slice to keep the slice a pure reducer with no side-effects.
-
-#### `uploadFile(file: File): AppThunk`
-
-1. Dispatches `uploadStarted`
-2. Calls `uploadGeoJSON(file, percent => dispatch(uploadProgressUpdated(percent)))`
-3. On success: dispatches `uploadSucceeded(result)`, fires a success toast
-4. On error: dispatches `uploadFailed(message)`, fires an error toast
-
-#### `analyseCurrentFC(): AppThunk`
-
-1. Reads `pendingFC ?? featureCollection` from state; returns early if null
-2. Dispatches `analyseStarted`
-3. Calls `updateGeoJSON(fc)`
-4. On success: dispatches `analyseSucceeded(result)`, fires a success toast
-5. On error: dispatches `analyseFailed()`, fires an error toast
-
-### 7.5 Selectors
-
-**File:** `src/store/selectors.ts`
-
-All expensive computations live here. Components call a selector and render its result.
-
-#### Raw Selectors (no memoisation)
-
-Cheap single-field projections: `selectDashboard`, `selectTable`, `selectResponse`, `selectFeatureCollection`, `selectSelectedIndex`, `selectUploadStatus`, `selectUploadProgress`, `selectFilename`, `selectIsSaving`, `selectError`, `selectHasPending`, `selectHasData`, plus all table UI selectors.
-
-`selectHasPending` returns `true` when either `pendingFC !== null` or `hasPending === true`.
-
-`selectHasData` returns `true` when `uploadStatus === "success"` and `response !== null`.
-
-#### Derived (memoised) Selectors
-
-**`selectPresentOriginalIndices`** *(new internal selector)* — Builds a `Set<number>` of `_originalIndex` values currently present in the live FC. Used by `selectDeletedIndices`.
-
-**`selectDeletedIndices`** — `Set<number>` of original indices that exist in `response.features` but are absent from the live FC. Derived by diffing `selectPresentOriginalIndices` against all backend feature indices, so it correctly handles features added after upload.
-
-**`selectAllRows`** — Merges backend `ProcessedFeature` records with live FC metadata into `TableRow[]`. Two categories: deleted rows (staged for removal, shown with a DELETED badge) followed by live rows. Each `TableRow` carries:
-
-```ts
-interface TableRow {
-  index: number;               // Live FC array position (>= 0) for live rows;
-                               // -(originalIndex + 1) for deleted rows — never
-                               // collides with a live array position.
-  pf: ProcessedFeature | null; // null for newly-drawn features
-  originalIndex: number | null;// Stable _originalIndex from backend; null for drawn features
-  geomType: string;
-  isDrawn: boolean;            // true = drawn after last analysis
-  isDeleted: boolean;          // true = deleted via map edit (staged, not yet saved)
-  isEdited: boolean;           // true = properties edited in table
-}
+```
+Browser
+  │
+  ▼
+app/page.tsx  ── thin orchestrator: reads selectors, dispatches actions/thunks
+  │
+  ├─→ UploadZone        (no data yet)
+  ├─→ SummaryCards       ┐
+  ├─→ MapView             │  read from Redux via selectors,
+  ├─→ IssuesPanel         │  call back up via props
+  └─→ FeatureTable       ┘  (reads/dispatches Redux directly — see below)
+        │
+        ▼
+   Redux store (dashboard + table slices)
+        │
+        ▼
+   dashboardThunks → lib/api.ts → FastAPI backend
 ```
 
-**`selectFilterCounts`** — `Record<FeatureFilter, number>` for the filter tab badges. Excludes deleted rows from the `"all"` count.
+`page.tsx` is deliberately layout-only. Business logic lives in the store;
+derived/computed table data lives in `selectors.ts`. `FeatureTable` is the one
+exception to "components read via props" — it reads its own filter/search/sort/page
+state directly from the `table` slice via `useAppSelector`, so `page.tsx` doesn't
+need to thread that state through.
 
-**`selectFilteredRows`** — Applies the active filter tab. Deleted and drawn features only appear under `"all"`.
-
-**`selectSearchedRows`** — Case-insensitive search across feature index, geometry type, and all non-`_` property keys and values. Deleted rows look up properties from `pf.feature.properties` (backend snapshot) rather than the live FC, since their `index` is a negative sentinel and not a valid array position.
-
-**`selectSortedRows`** — Sorts by `index`, `type` (alphabetical), `valid`, `duplicate`, or `area`.
-
-**`selectTotalFilteredCount`** — Counts only live (non-deleted) rows so pagination arithmetic is not inflated by pinned deleted rows.
-
-**`selectPagedRows`** — Separates deleted rows from live rows before slicing. Deleted rows are prepended to every page so pending deletions remain visible regardless of which page the user is on. Only live rows count toward the page size.
-
----
-
-## 8. Components
-
-### 8.1 Layout & Providers
-
-**`src/app/layout.tsx`** — Root layout. Wraps the app in `ReduxProvider` and renders a `react-hot-toast` `<Toaster>` with dark-mode styling. Sets page title/description metadata.
-
-**`src/providers/ReduxProvider.tsx`** — Thin `"use client"` wrapper around `react-redux`'s `<Provider>`. Required because `layout.tsx` is a server component.
-
-### 8.2 Dashboard Page
-
-**`src/app/page.tsx`** — Orchestrator component. Reads state from selectors, converts user interactions into dispatched actions/thunks, and passes props down to leaf components. Contains no business logic itself.
-
-**Conditional rendering:**
-
-- `!hasData` → shows `<UploadZone>`
-- `hasData` → shows `<SummaryCards>`, `<MapView>` + `<IssuesPanel>` side-by-side, then `<FeatureTable>`
-
-**Handler summary:**
-
-| Handler | Dispatches |
-|---|---|
-| `handleUpload(file)` | `uploadFile(file)` thunk |
-| `handleMapSave(fc)` | `mapEditStaged(fc)` + toast |
-| `handleApplyFix(issue)` | `geometryFixApplied(issue)` + toast |
-| `handleUpdateProperties(index, props)` | `propertiesUpdated({ index, props })` |
-| `handleAnalyse()` | `analyseCurrentFC()` thunk |
-| `handleDownload()` | `downloadGeoJSON(fc, filename)` + toast |
-| `handleReset()` | `resetDashboard()` |
-| `handleSelectFeature(idx)` | `featureSelected(idx < 0 ? null : idx)` |
-
-### 8.3 Header
-
-**`src/components/ui/Header.tsx`**
-
-Sticky top bar (`z-50`). Always shows the brand name; conditionally renders:
-
-- Filename badge (when `filename !== null`)
-- Save button (when `onAnalyse` provided **and** `hasPending === true`)
-- Download button (when `onDownload` provided)
-- New File button (when `filename !== null`)
-
-The Save button is `disabled` while `isSaving` is true.
-
-**Props:**
+## State model (`store/dashboardSlice.ts`)
 
 ```ts
-interface HeaderProps {
+interface DashboardState {
+  uploadStatus: "idle" | "uploading" | "success" | "error";
+  uploadProgress: number;
   filename: string | null;
-  onReset: () => void;
-  onDownload?: () => void;
-  onAnalyse?: () => void;
-  hasPending: boolean;
+  fileSizeBytes: number | null;
+  response: ProcessGeoJSONResponse | null;   // last backend analysis report
+  featureCollection: FeatureCollection | null; // live data shown on map/table
+  hasUnsavedChanges: boolean;                  // true when featureCollection has diverged from `response`
+  selectedFeatureIndex: number | null;
   isSaving: boolean;
-}
-```
-
-### 8.4 UploadZone
-
-**`src/components/upload/UploadZone.tsx`**
-
-Drag-and-drop zone powered by `react-dropzone`. Accepts only `.geojson` files (MIME types `application/json` and `application/geo+json`), max 1 file, max 100 MB.
-
-**States:**
-
-- `idle` — Upload icon, text prompt, browse link
-- `isDragActive` — FileJson icon, "Drop your .geojson file here"
-- `uploading` — Spinner, "Processing... {progress}%", progress bar
-- `error` — Red error banner below the zone
-
-The zone is `disabled` and `pointer-events-none` while `status === "uploading"`.
-
-**Props:**
-
-```ts
-interface UploadZoneProps {
-  onUpload: (file: File) => void;
-  status: UploadStatus;
-  progress: number;
   error: string | null;
 }
 ```
 
-### 8.5 SummaryCards
+**Two kinds of "current data" are tracked deliberately:**
 
-**`src/components/ui/SummaryCards.tsx`**
+- `response` — the last full analysis from the backend (`/upload` or `/save`).
+  This is the source of truth for issues, duplicate groups, and per-feature
+  validity/area/centroid.
+- `featureCollection` — the live geometry/properties shown on the map and
+  table. After an upload or save these match exactly (each feature stamped
+  with `properties._originalIndex` linking it back to its `ProcessedFeature`
+  in `response.features`). Local edits (map draw/delete, inline property
+  edits, applied auto-fixes) mutate `featureCollection` immediately for a
+  responsive UI, while `hasUnsavedChanges` flips to `true` and the Header's
+  Save button appears. `response` is patched optimistically alongside it
+  (e.g. removing issues for deleted features) so the UI doesn't look stale
+  while waiting for the next save — but the full re-validation only happens
+  once the user clicks Save and the backend responds.
 
-Four metric cards in a responsive `2 × 2` → `1 × 4` grid. Each card shows an icon, a large numeric value, and a label.
+### Actions
 
-| Card | Value | Color |
+| Action | Trigger | Effect |
 |---|---|---|
-| Total Features | `summary.total_features` | Blue |
-| Valid | `summary.valid_features` | Green |
-| Issues | `summary.invalid_features` | Red |
-| Duplicate Groups | `summary.duplicate_groups` | Purple |
+| `uploadStarted` / `uploadProgressUpdated` / `uploadSucceeded` / `uploadFailed` | `uploadFile` thunk | Drive the upload lifecycle; `uploadSucceeded` stamps and stores the new `featureCollection` |
+| `mapEditStaged` | MapView "Save" (local, see below) | Replaces `featureCollection` with the edited version; optimistically trims issues/duplicate groups for deleted features; sets `hasUnsavedChanges` |
+| `geometryFixApplied` | IssuesPanel "Apply Fix" | Patches one feature's geometry in `featureCollection`, marks it valid in `response`, removes its issue |
+| `propertiesUpdated` | FeatureTable inline edit | Merges new property values into one feature, stamps `_edited: true`, sets `hasUnsavedChanges` |
+| `saveStarted` / `saveSucceeded` / `saveFailed` | `saveChanges` thunk | `saveSucceeded` replaces both `response` and `featureCollection` with the fresh backend result and clears `hasUnsavedChanges` |
+| `featureSelected` | map click / table row / issue card | Sets `selectedFeatureIndex`, used to sync highlighting across all three panels |
+| `resetDashboard` | Header "New File" | Returns to `initialState` |
 
-**Props:** `{ summary: AnalysisSummary }`
+### Naming convention: "Save" is the one verb
 
-### 8.6 MapView
+Every layer — the Header button label, the Redux actions (`saveStarted` /
+`saveSucceeded` / `saveFailed`), the thunk (`saveChanges`), the API client
+function (`saveFeatureCollection`), and the backend route (`POST /api/geojson/save`)
+— uses **save**, consistently. There is no separate "update" or "analyse"
+terminology anywhere in this flow; if you're adding a new feature that
+re-submits data to the backend, follow this naming rather than introducing a
+new verb.
 
-**`src/components/map/MapView.tsx`**
+### Two distinct "saves" — don't confuse them
 
-MapLibre GL map rendered via `react-map-gl`. Features are colour-coded by status using `getFeatureColor`. Includes draw tools (via `maplibre-gl-draw` or similar) for adding, editing, and deleting features. Fires `onSave(updatedFC)` when the user commits draw edits. Fires `onSelectFeature(index)` when a feature is clicked.
+- **MapView's local save** (`onSave` prop, wired to `mapEditStaged`) commits
+  draw/delete edits from the map's edit-mode toolbar into Redux. This is a
+  client-side commit only — it does **not** call the backend. It exists so
+  the map's edit session has a clear "done editing" boundary distinct from
+  the global save.
+- **The Header's Save button** (`onSave` prop, wired to `saveChanges()`) is
+  the one that calls the backend (`POST /api/geojson/save`) and refreshes
+  `response` with a real re-validation. It only appears when
+  `hasUnsavedChanges` is true.
 
-> **Note:** MapView is excluded from unit tests because MapLibre requires WebGL, which is unavailable in jsdom. The `src/__mocks__/maplibre-gl.ts` mock prevents import errors without attempting to render the map.
+Both are named "Save" by design (it's the same end-user concept — "save my
+edits" — at two different scopes), but they dispatch different actions and
+only one of them talks to the network.
 
-**Props:**
+## Table UI state (`store/tableSlice.ts`)
+
+Kept in Redux (rather than `FeatureTable` local state) specifically so the
+table preserves position when the user clicks a feature on the map or in the
+issues panel, and resets predictably on new data:
 
 ```ts
-{
-  featureCollection: FeatureCollection;
-  processedFeatures: ProcessedFeature[];
-  selectedIndex: number | null;
-  onSelectFeature: (index: number) => void;
-  onSave: (updatedFC: FeatureCollection) => void;
+interface TableState {
+  filter: "all" | "valid" | "invalid" | "duplicate";
+  searchQuery: string;
+  sortKey: "index" | "type" | "valid" | "duplicate" | "area";
+  sortDir: "asc" | "desc";
+  currentPage: number;
+  pageSize: number;
 }
 ```
 
-### 8.7 IssuesPanel
+`extraReducers` listen for `dashboardSlice` actions:
+- `uploadSucceeded` → full reset to `initialState` (new dataset, nothing to preserve)
+- `saveSucceeded` → resets page to 1 and clears search, but **keeps** the
+  active filter tab and page size, since those usually still apply after a re-save
 
-**`src/components/ui/IssuesPanel.tsx`**
+## Selectors (`store/selectors.ts`)
 
-Scrollable `h-[480px]` panel listing geometry issues and duplicate groups.
+Two kinds:
 
-- If `summary.issues` and `summary.duplicate_groups_detail` are both empty, shows a "No issues found" placeholder.
-- Each issue card shows the feature index/ID, description, issue type, and optionally a "Fixable" badge and "Apply fix" button.
-- The header shows a "Fix all (N)" button when multiple fixable issues are present and `onApplyFix` is provided.
-- Each duplicate group card shows the group description and clickable `#index` chips.
+**Raw / cheap** — direct property access, no memoisation needed
+(`selectFeatureCollection`, `selectIsSaving`, `selectHasUnsavedChanges`, etc.)
 
-**Props:**
-
-```ts
-interface IssuesPanelProps {
-  summary: AnalysisSummary;
-  featureCollection: FeatureCollection | null; // Used to resolve _originalIndex → live FC position
-  onSelectFeature: (index: number) => void;
-  onApplyFix?: (issue: GeometryIssue) => void;
-}
-```
-
-The internal `resolveLiveIndex(fc, originalIndex)` helper translates a backend `_originalIndex` (from `issue.feature_index` or `group.feature_indices`) into the current live FC array position before calling `onSelectFeature`. This ensures that after a deletion shifts array positions, clicking an issue chip or duplicate chip still navigates to the correct feature. The chip label continues to display the original backend index for consistency with the analysis report.'''
-
-### 8.8 FeatureTable
-
-**`src/components/table/FeatureTable.tsx`**
-
-Paginated, searchable, sortable, and inline-editable feature list. Reads all state directly from Redux via `useAppSelector` — the parent page passes only two callbacks.
-
-**Redux state consumed:** `filter`, `searchQuery`, `sortKey`, `sortDir`, `currentPage`, `pageSize`, `pagedRows`, `totalFilteredCount`, `totalPages`, `filterCounts`, `selectedIndex`, `featureCollection`.
-
-**Local state:** `editingIndex`, `editProps`, `newPropKey`, `newPropValue` (inline edit form).
-
-**Features:**
-
-- Filter tabs (All / Valid / Issues / Duplicates) with count badges
-- Free-text search bar
-- Sortable columns (index, type, valid, duplicate, area) with chevron indicators
-- Inline property editing: pencil → edit form → confirm/cancel
-- Row status badges (DELETED, EDITED, DRAWN)
-- Selected row amber highlight
-- Full pagination with first/prev/page pills/next/last controls and page-size selector
-- "No results" message when filter + search yield zero rows
-
-**Props:**
-
-```ts
-interface FeatureTableProps {
-  onSelectFeature: (index: number) => void;
-  onUpdateProperties?: (index: number, props: Record<string, string>) => void;
-}
-```
-
----
-
-## 9. State Management Data Flow
+**Derived / memoised** (via `createSelector`) — the table's
+filter → search → sort → paginate pipeline:
 
 ```
-User action
-    │
-    ▼
-page.tsx handler
-    │
-    ├─ sync action → dispatch(sliceAction(payload))
-    │                       │
-    │                       ▼
-    │               Redux reducer mutates state (Immer)
-    │
-    └─ async action → dispatch(thunk())
-                             │
-                             ├─ dispatch(pendingAction)
-                             ├─ await API call
-                             └─ dispatch(succeededAction | failedAction)
-
-State change
-    │
-    ▼
-Memoised selectors recompute (only if inputs changed)
-    │
-    ▼
-Subscribed components re-render with new derived data
+selectAllProcessedFeatures
+        │
+selectPresentOriginalIndices ──→ selectDeletedIndices
+        │
+        ▼
+selectAllRows  (merges backend ProcessedFeature with live FeatureCollection state
+                into a TableRow; computes isDrawn / isDeleted / isEdited flags)
+        │
+        ▼
+selectFilteredRows  (apply active filter tab)
+        │
+        ▼
+selectSearchedRows  (apply free-text search across visible properties)
+        │
+        ▼
+selectSortedRows    (apply sort key/direction)
+        │
+        ├─→ selectTotalFilteredCount / selectTotalPages
+        │
+        ▼
+selectPagedRows  (slice to current page; deleted rows are pinned above every
+                  page, outside the page-size count, so pending deletions are
+                  always visible before the next save)
 ```
 
-**Feature index lifetime:**
+`TableRow.index` uses a **negative sentinel** (`-(originalIndex + 1)`) for
+deleted rows so it can never collide with a live array position — this is a
+React-key convenience only; components must use `row.originalIndex` for any
+actual property lookup on a deleted row.
 
-A `_originalIndex` stamp is applied to each feature in the live `FeatureCollection` when a backend response is processed (`buildStampedFC`). This stamp is the **stable identity key** across the entire app:
+## API client (`lib/api.ts`)
 
-- `FeatureTable` — `TableRow.originalIndex` is used for property lookups on deleted rows; `TableRow.index` (live FC array position) is only used for live rows.
-- `MapView` — `handleDeleteSelected` identifies the target feature by `_originalIndex` before filtering, so sequential deletions do not shift positions and remove the wrong feature.
-- `IssuesPanel` — `resolveLiveIndex` translates backend `_originalIndex` values in issue/duplicate chips back to the current live FC array position before calling `onSelectFeature`.
-- `selectDeletedIndices` — diffs the set of `_originalIndex` values present in the live FC against all backend feature indices to determine which features have been staged for deletion.
+Three functions, all returning typed promises and normalising backend error
+bodies (`detail` / `error` fields) into plain `Error` objects:
 
-Newly drawn features have no `_originalIndex`. Deleted features retain their original index in `selectDeletedIndices` and remain visible in the table with a DELETED badge until the user saves and re-analyses.'''
+| Function | Endpoint | Notes |
+|---|---|---|
+| `uploadGeoJSON(file, onProgress?)` | `POST /api/geojson/upload` | Uses `XMLHttpRequest` when `onProgress` is supplied (for the progress bar), falls back to `fetch` otherwise |
+| `saveFeatureCollection(fc)` | `POST /api/geojson/save` | Plain `fetch`, JSON body |
+| `checkHealth()` | `GET /health` | Liveness check; not currently wired into any UI |
 
----
+Base URL comes from `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8000`).
 
-## 10. Testing
+## Thunks (`store/dashboardThunks.ts`)
 
-Tests live in `src/__tests__/dashboard.test.tsx` and are run with Jest + React Testing Library.
+- **`uploadFile(file)`** — dispatches the upload lifecycle actions, forwards
+  XHR progress events into `uploadProgressUpdated`, and fires a success/error toast.
+- **`saveChanges()`** — reads the current `featureCollection` from state,
+  calls `saveFeatureCollection`, dispatches `saveSucceeded`/`saveFailed`, and
+  toasts the result. No-ops if there's no `featureCollection` yet.
+
+## Components
+
+### `MapView.tsx`
+
+The most stateful component — owns its own edit-mode session
+(`isEditing`, `drawTool`, `drawPoints`, `attrEdit`) on top of the Redux-backed
+`featureCollection` prop.
+
+- **Render-vs-effect note:** `editedFC` (the map's working copy) is kept in
+  sync with the `featureCollection` prop via a render-time check
+  (`if (!isEditing && featureCollection !== lastSyncedFCRef.current) { ... setEditedFC(...) }`)
+  rather than inside a `useEffect`. This follows React's
+  ["you might not need an effect"](https://react.dev/learn/you-might-not-need-an-effect)
+  guidance for adjusting state during render and avoids an extra render pass;
+  don't move this back into an effect without good reason, since
+  `react-hooks/set-state-in-effect` will flag it again.
+- Colour-codes features by status (valid / invalid / duplicate / selected)
+  via `getFeatureColor()`.
+- Legend click sets a `LegendFilter` that dims non-matching features to greyscale.
+- Edit mode supports: drawing new polygons (click to add vertices,
+  double-click to close) or points, deleting the selected feature, and
+  editing attribute properties via an inline modal — all staged in local
+  `editedFC` state until "Save" (→ `onSave` → `mapEditStaged`) or "Cancel"
+  (discards back to the `featureCollection` prop).
+
+### `FeatureTable.tsx`
+
+Reads its own UI state from the `table` slice and derived rows from
+`selectors.ts`; only needs `onSelectFeature` and `onUpdateProperties` as props.
+Inline property editing is staged in local component state
+(`editingIndex` / `editProps`) until the row's save button commits it via
+`onUpdateProperties` → `propertiesUpdated`.
+
+### `IssuesPanel.tsx`
+
+Lists `GeometryIssue`s and `DuplicateGroup`s from `response.summary`. Issue
+cards resolve a feature's `_originalIndex` to its current live array position
+(`resolveLiveIndex`) before calling `onSelectFeature`, since a feature's
+position in `featureCollection` can shift after deletions. "Apply Fix" only
+shows for issues with `auto_fix_available` and a non-null `fixed_geometry`.
+
+### `Header.tsx`
+
+Stateless — all five props (`filename`, `onReset`, `onDownload`, `onSave`,
+`hasUnsavedChanges`, `isSaving`) are passed down from `page.tsx`. The Save
+button only renders when both `onSave` and `hasUnsavedChanges` are truthy,
+and is disabled while `isSaving`.
+
+### `UploadZone.tsx`
+
+Wraps `react-dropzone`; accepts `.geojson` files up to the configured max
+size, shows a progress bar driven by Redux state (not local state) so it
+stays in sync with the XHR upload happening in the thunk.
+
+## Types (`types/index.ts`)
+
+Single source of truth for shapes that mirror the backend's Pydantic models
+(`GeometryIssue`, `DuplicateGroup`, `AnalysisSummary`, `ProcessedFeature`,
+`ProcessGeoJSONResponse`) plus a few frontend-only types (`UploadStatus`,
+`FeatureFilter`, `MapViewState`). `UploadStatus` is defined once here and
+re-exported through `dashboardSlice.ts` — don't redefine it elsewhere.
+
+`DashboardState` is **not** defined here; its single definition lives in
+`store/dashboardSlice.ts` next to the reducer that owns it, since that's the
+shape actually used by the store.
+
+## Running locally
 
 ```bash
-npm test           # run once
-npm run test:watch # watch mode
+cd frontend
+npm install
+npm run dev
 ```
 
-### Test Coverage Areas
+Requires `NEXT_PUBLIC_API_URL` pointed at a running backend (see
+`frontend/.env.example`; defaults to `http://localhost:8000`).
 
-| Area | What is tested |
-|---|---|
-| `computeBBox` | Simple polygon, empty FC, null geometries, multi-feature spanning |
-| `formatBytes` | Bytes, KB, MB formatting |
-| `getFeatureColor` | All four colour states and priority ordering |
-| `isGeometry` | Positive and negative type guard cases |
-| `SummaryCards` | Values, labels, zero-value rendering |
-| `IssuesPanel` | Empty state, issue cards, fixable/non-fixable distinction, callbacks |
-| `Header` | Brand, filename badge, conditional buttons, button callbacks |
-| `FeatureTable` | Redux-connected: filter tabs, search, selection, empty state, property editing |
-| `UploadZone` | Idle, uploading, error states |
-| Redux slices | `dashboardSlice` and `tableSlice` reducer logic |
-| Selectors | `selectFilterCounts`, `selectPagedRows`, `selectDeletedIndices`, search, sort |
-| `downloadGeoJSON` | DOM side-effect (URL creation, anchor click) |
-| `getInitialViewState` | Centroid computation, empty FC fallback |
-| API client | `uploadGeoJSON` (fetch path, XHR path, error handling), `updateGeoJSON`, `checkHealth` |
+## Testing
 
-### Test Utilities
-
-**`makePolygonFC(...rings)`** — Creates a `FeatureCollection` of `Polygon` features from coordinate rings.
-
-**`makeMockFeature(index, isValid, isDuplicate)`** — Creates a `ProcessedFeature` with a standard coffee-farm polygon.
-
-**`renderWithStore(ui, preloadedState?)`** — Renders a component inside a real Redux store. Used for Redux-connected components like `FeatureTable`.
-
-### Mocks
-
-**`src/__mocks__/maplibre-gl.ts`** — Jest manual mock. Replaces `maplibre-gl` with a minimal stub so `MapView` can be imported without WebGL. `MapView` itself is not rendered in tests.
-
-The mock is registered in `jest.config.ts`:
-
-```ts
-moduleNameMapper: {
-  "^maplibre-gl$": "<rootDir>/src/__mocks__/maplibre-gl.ts",
-}
+```bash
+cd frontend
+npm test
 ```
 
----
+`src/__tests__/dashboard.test.tsx` is the entire suite: pure utility
+functions, every `dashboardSlice`/`tableSlice` reducer case, every memoised
+selector (including pagination/search/sort edge cases), and component
+behaviour for `SummaryCards`, `IssuesPanel`, `Header`, `UploadZone`, and the
+Redux-connected `FeatureTable`. MapLibre is mocked (`src/__mocks__/maplibre-gl.ts`)
+since it requires a real WebGL context.
 
-## 11. Configuration Files
+## Linting
 
-### `next.config.ts`
-
-Standard Next.js config. No custom webpack overrides required.
-
-### `tsconfig.json`
-
-- `"strict": true`
-- Path alias: `"@/*"` → `"./src/*"` (used throughout the codebase as `@/store`, `@/types`, etc.)
-
-### `tailwind.config.ts`
-
-Scans `./src/**/*.{ts,tsx}` for class names. No custom theme extensions (uses Tailwind defaults).
-
-### `jest.config.ts`
-
-Uses `next/jest` preset for Next.js-aware transformation. Key settings:
-
-```ts
-testEnvironment: "jsdom"
-setupFilesAfterFramework: ["@testing-library/jest-dom"]
-moduleNameMapper: {
-  "^@/(.*)$": "<rootDir>/src/$1",
-  "^maplibre-gl$": "<rootDir>/src/__mocks__/maplibre-gl.ts"
-}
+```bash
+cd frontend
+npx eslint .
+npx tsc --noEmit
 ```
 
-### `Dockerfile`
+Config is `eslint-config-next` (core-web-vitals + typescript) via
+`eslint.config.mjs`. Notably enforces `react-hooks/set-state-in-effect` — see
+the `MapView.tsx` note above if you see this rule fire.
 
-Multi-stage build:
+## Known limitations
 
-1. **deps** — installs `node_modules` from `package-lock.json`
-2. **builder** — copies source, runs `next build`
-3. **runner** — minimal Node 20 Alpine image, copies only the `.next/standalone` output
-
-### `.env.example`
-
-```
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
----
-
-## 12. GeoJSON Architecture Notes
-
-For scaling to a production SaaS GIS platform:
-
-```
-Client Upload (.geojson)
-    ↓
-FastAPI preprocessing (Shapely validation, duplicate detection)
-    ↓
-PostGIS storage (spatial indexing, ST_IsValid, ST_MakeValid)
-    ↓
-GDAL → Vector Tiles (.mvt / .pbf)
-    ↓
-MapLibre GL JS (tile rendering, fast at scale)
-```
-
-The current implementation uses raw GeoJSON rendering, which is suitable for files up to ~10 000 features. For larger datasets, move to the vector tiles pipeline described above.
+- `checkHealth()` exists in the API client but isn't called from any
+  component — there's no liveness indicator in the UI yet.
+- Duplicate detection is exact-match only (inherited from the backend); the
+  frontend has no separate near-duplicate visualisation.
+- `MapView`'s draw tool only supports polygons and points — no lines/multi-geometries.

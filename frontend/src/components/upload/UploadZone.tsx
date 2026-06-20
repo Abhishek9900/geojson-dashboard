@@ -5,7 +5,7 @@
  */
 
 import { useCallback } from "react";
-import { useDropzone, type FileRejection, type DropEvent } from "react-dropzone";
+import { useDropzone, type FileRejection } from "react-dropzone";
 import { Upload, FileJson, Loader2 } from "lucide-react";
 import type { UploadStatus } from "@/types";
 
@@ -18,11 +18,7 @@ interface UploadZoneProps {
 
 export function UploadZone({ onUpload, status, progress, error }: UploadZoneProps) {
   const onDrop = useCallback(
-    (
-      acceptedFiles: File[],
-      fileRejections: FileRejection[],
-      _event: DropEvent
-    ) => {
+    (acceptedFiles: File[], fileRejections: FileRejection[]) => {
       if (fileRejections.length > 0) {
         return;
       }
@@ -49,15 +45,15 @@ export function UploadZone({ onUpload, status, progress, error }: UploadZoneProp
   const rejectionMessage = fileRejections[0]?.errors[0]?.message;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+    <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
       <div className="w-full max-w-lg">
         {/* Dropzone */}
         <div
           {...getRootProps()}
           className={[
-            "relative rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all",
+            "relative cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-all",
             isDragActive
-              ? "border-green-500 bg-green-500/10 scale-[1.02]"
+              ? "scale-[1.02] border-green-500 bg-green-500/10"
               : "border-slate-600 bg-slate-900 hover:border-slate-500 hover:bg-slate-800/60",
             status === "uploading" ? "pointer-events-none opacity-75" : "",
           ].join(" ")}
@@ -66,42 +62,38 @@ export function UploadZone({ onUpload, status, progress, error }: UploadZoneProp
 
           <div className="flex flex-col items-center gap-4">
             {status === "uploading" ? (
-              <Loader2 className="w-12 h-12 text-green-400 animate-spin" />
+              <Loader2 className="h-12 w-12 animate-spin text-green-400" />
             ) : isDragActive ? (
-              <FileJson className="w-12 h-12 text-green-400" />
+              <FileJson className="h-12 w-12 text-green-400" />
             ) : (
-              <Upload className="w-12 h-12 text-slate-500" />
+              <Upload className="h-12 w-12 text-slate-500" />
             )}
 
             <div>
               {status === "uploading" ? (
                 <>
-                  <p className="text-base font-medium text-slate-200">
-                    Processing... {progress}%
-                  </p>
-                  <div className="mt-3 w-48 mx-auto h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                  <p className="text-base font-medium text-slate-200">Processing... {progress}%</p>
+                  <div className="mx-auto mt-3 h-1.5 w-48 overflow-hidden rounded-full bg-slate-700">
                     <div
-                      className="h-full bg-green-500 transition-all duration-300 rounded-full"
+                      className="h-full rounded-full bg-green-500 transition-all duration-300"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
                 </>
               ) : isDragActive ? (
-                <p className="text-base font-medium text-green-300">
-                  Drop your .geojson file here
-                </p>
+                <p className="text-base font-medium text-green-300">Drop your .geojson file here</p>
               ) : (
                 <>
                   <p className="text-base font-medium text-slate-200">
                     Drag & drop a .geojson file
                   </p>
-                  <p className="text-sm text-slate-500 mt-1">
+                  <p className="mt-1 text-sm text-slate-500">
                     or{" "}
                     <span className="text-green-400 underline underline-offset-2">
                       browse to upload
                     </span>
                   </p>
-                  <p className="text-xs text-slate-600 mt-3">
+                  <p className="mt-3 text-xs text-slate-600">
                     Only .geojson files accepted · Max 100 MB
                   </p>
                 </>
@@ -112,7 +104,7 @@ export function UploadZone({ onUpload, status, progress, error }: UploadZoneProp
 
         {/* Error display */}
         {(error || rejectionMessage) && (
-          <div className="mt-3 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3">
+          <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3">
             <p className="text-sm text-red-300">{error ?? rejectionMessage}</p>
           </div>
         )}

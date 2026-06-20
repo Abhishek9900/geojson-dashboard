@@ -5,9 +5,9 @@
  *  - Utility functions: computeBBox, computeFeatureBBox, getInitialViewState,
  *    downloadGeoJSON, formatBytes, getFeatureColor, isGeometry.
  *  - Redux slices: dashboardSlice (all reducers), tableSlice (all reducers + extraReducers).
- *  - Redux selectors: selectHasData, selectHasPending, selectFilterCounts,
+ *  - Redux selectors: selectHasData, selectHasUnsavedChanges, selectFilterCounts,
  *    selectDeletedIndices, selectAllRows, selectPagedRows, search, sort, pagination.
- *  - API client: uploadGeoJSON (fetch + XHR paths), updateGeoJSON, checkHealth.
+ *  - API client: uploadGeoJSON (fetch + XHR paths), saveFeatureCollection, checkHealth.
  *  - Components: SummaryCards, IssuesPanel, Header, UploadZone, FeatureTable.
  *
  * Run with: npm test
@@ -47,9 +47,9 @@ import dashboardReducer, {
   mapEditStaged,
   geometryFixApplied,
   propertiesUpdated,
-  analyseStarted,
-  analyseSucceeded,
-  analyseFailed,
+  saveStarted,
+  saveSucceeded,
+  saveFailed,
   featureSelected,
   resetDashboard,
   type DashboardState,
@@ -64,7 +64,7 @@ import tableReducer, {
 } from "@/store/tableSlice";
 import {
   selectHasData,
-  selectHasPending,
+  selectHasUnsavedChanges,
   selectFilterCounts,
   selectDeletedIndices,
   selectAllRows,
@@ -165,9 +165,7 @@ function renderWithStore(
 }
 
 /** Build a preloaded state for a store with data already loaded. */
-function makeLoadedState(
-  features: ProcessedFeature[]
-): { dashboard: Partial<DashboardState> } {
+function makeLoadedState(features: ProcessedFeature[]): { dashboard: Partial<DashboardState> } {
   const response = makeMockResponse(features);
   const featureCollection: FeatureCollection = {
     type: "FeatureCollection",
@@ -184,10 +182,9 @@ function makeLoadedState(
       fileSizeBytes: 1024,
       response,
       featureCollection,
-      pendingFC: null,
       selectedFeatureIndex: null,
       isSaving: false,
-      hasPending: false,
+      hasUnsavedChanges: false,
       error: null,
     },
   };
@@ -222,9 +219,7 @@ describe("computeBBox", () => {
   it("returns null when all features have null geometry", () => {
     const fc: FeatureCollection = {
       type: "FeatureCollection",
-      features: [
-        { type: "Feature", properties: {}, geometry: null as never },
-      ],
+      features: [{ type: "Feature", properties: {}, geometry: null as never }],
     };
     expect(computeBBox(fc)).toBeNull();
   });
@@ -376,7 +371,9 @@ describe("downloadGeoJSON", () => {
       writable: true,
     });
 
-    const appendChildMock = jest.spyOn(document.body, "appendChild").mockImplementation(() => document.body);
+    const appendChildMock = jest
+      .spyOn(document.body, "appendChild")
+      .mockImplementation(() => document.body);
     const createElementMock = jest.spyOn(document, "createElement").mockReturnValue({
       href: "",
       download: "",
@@ -549,10 +546,9 @@ describe("dashboardSlice", () => {
     expect(initial.filename).toBeNull();
     expect(initial.response).toBeNull();
     expect(initial.featureCollection).toBeNull();
-    expect(initial.pendingFC).toBeNull();
     expect(initial.selectedFeatureIndex).toBeNull();
     expect(initial.isSaving).toBe(false);
-    expect(initial.hasPending).toBe(false);
+    expect(initial.hasUnsavedChanges).toBe(false);
     expect(initial.error).toBeNull();
   });
 
@@ -587,9 +583,8 @@ describe("dashboardSlice", () => {
     // Stamping: each feature has _originalIndex
     expect(state.featureCollection!.features[0].properties!._originalIndex).toBe(0);
     expect(state.featureCollection!.features[1].properties!._originalIndex).toBe(1);
-    expect(state.pendingFC).toBeNull();
     expect(state.error).toBeNull();
-    expect(state.hasPending).toBe(false);
+    expect(state.hasUnsavedChanges).toBe(false);
   });
 
   it("uploadSucceeded clears _edited stamps from previous upload", () => {
@@ -611,43 +606,41 @@ describe("dashboardSlice", () => {
     expect(state.selectedFeatureIndex).toBeNull();
   });
 
-  it("analyseStarted sets isSaving", () => {
-    const state = dashboardReducer(initial, analyseStarted());
+  it("saveStarted sets isSaving", () => {
+    const state = dashboardReducer(initial, saveStarted());
     expect(state.isSaving).toBe(true);
   });
 
-  it("analyseSucceeded clears isSaving and pending state", () => {
-    const withPending = {
+  it("saveSucceeded clears isSaving and unsaved-changes state", () => {
+    const withUnsavedChanges = {
       ...initial,
       isSaving: true,
-      hasPending: true,
+      hasUnsavedChanges: true,
       selectedFeatureIndex: 2,
     };
     const response = makeMockResponse([makeMockFeature(0)]);
-    const state = dashboardReducer(withPending, analyseSucceeded(response));
+    const state = dashboardReducer(withUnsavedChanges, saveSucceeded(response));
 
     expect(state.isSaving).toBe(false);
-    expect(state.hasPending).toBe(false);
-    expect(state.pendingFC).toBeNull();
+    expect(state.hasUnsavedChanges).toBe(false);
     expect(state.selectedFeatureIndex).toBeNull();
     expect(state.response).toBe(response);
   });
 
-  it("analyseFailed clears isSaving only", () => {
+  it("saveFailed clears isSaving only", () => {
     const withSaving = { ...initial, isSaving: true };
-    const state = dashboardReducer(withSaving, analyseFailed());
+    const state = dashboardReducer(withSaving, saveFailed());
     expect(state.isSaving).toBe(false);
   });
 
-  it("propertiesUpdated merges props and sets hasPending", () => {
+  it("propertiesUpdated merges props and sets hasUnsavedChanges", () => {
     const response = makeMockResponse([makeMockFeature(0)]);
     const loaded = dashboardReducer(initial, uploadSucceeded(response));
     const state = dashboardReducer(
       loaded,
       propertiesUpdated({ index: 0, props: { name: "Field A" } })
     );
-    expect(state.hasPending).toBe(true);
-    expect(state.pendingFC).not.toBeNull();
+    expect(state.hasUnsavedChanges).toBe(true);
     const props = state.featureCollection!.features[0].properties!;
     expect(props.name).toBe("Field A");
     expect(props._edited).toBe(true);
@@ -663,7 +656,17 @@ describe("dashboardSlice", () => {
       issue_type: "self_intersection",
       description: "Self-intersection",
       auto_fix_available: true,
-      fixed_geometry: { type: "Polygon", coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+      fixed_geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [0, 0],
+            [1, 0],
+            [1, 1],
+            [0, 0],
+          ],
+        ],
+      },
     };
     const response = makeMockResponse([pf]);
     response.summary.issues = [issue];
@@ -710,7 +713,7 @@ describe("dashboardSlice", () => {
     const state = dashboardReducer(loaded, mapEditStaged(updatedFC));
 
     expect(state.featureCollection).toBe(updatedFC);
-    expect(state.pendingFC).toBe(updatedFC);
+    expect(state.hasUnsavedChanges).toBe(true);
     // Issue for deleted feature 0 should be gone
     expect(state.response!.summary.issues).toHaveLength(0);
   });
@@ -782,12 +785,12 @@ describe("tableSlice", () => {
     expect(state).toEqual(initial);
   });
 
-  it("resets page and search (but preserves filter) on analyseSucceeded", () => {
+  it("resets page and search (but preserves filter) on saveSucceeded", () => {
     let state = tableReducer(initial, filterChanged("invalid"));
     state = tableReducer(state, pageChanged(3));
     state = tableReducer(state, searchQueryChanged("test"));
     const response = makeMockResponse([makeMockFeature(0)]);
-    state = tableReducer(state, analyseSucceeded(response));
+    state = tableReducer(state, saveSucceeded(response));
     expect(state.currentPage).toBe(1);
     expect(state.searchQuery).toBe("");
     expect(state.filter).toBe("invalid"); // preserved
@@ -825,10 +828,9 @@ describe("Selectors", () => {
           fileSizeBytes: 1024,
           response,
           featureCollection,
-          pendingFC: null,
           selectedFeatureIndex: null,
           isSaving: false,
-          hasPending: false,
+          hasUnsavedChanges: false,
           error: null,
         },
       },
@@ -847,16 +849,16 @@ describe("Selectors", () => {
     expect(selectHasData(store.getState())).toBe(false);
   });
 
-  it("selectHasPending returns false when no pending changes", () => {
+  it("selectHasUnsavedChanges returns false when there are no unsaved changes", () => {
     const store = makeStoreWithFeatures([makeMockFeature(0)]);
-    expect(selectHasPending(store.getState())).toBe(false);
+    expect(selectHasUnsavedChanges(store.getState())).toBe(false);
   });
 
   it("selectFilterCounts returns correct counts", () => {
     const features = [
-      makeMockFeature(0, true, false),   // valid
-      makeMockFeature(1, false, false),  // invalid
-      makeMockFeature(2, true, true),    // duplicate
+      makeMockFeature(0, true, false), // valid
+      makeMockFeature(1, false, false), // invalid
+      makeMockFeature(2, true, true), // duplicate
     ];
     const store = makeStoreWithFeatures(features);
     const counts = selectFilterCounts(store.getState());
@@ -993,10 +995,7 @@ describe("IssuesPanel", () => {
 
   it("shows 'No issues found' when summary is clean", () => {
     render(
-      <IssuesPanel
-        summary={mockSummary}
-        onSelectFeature={jest.fn()}
-      />
+      <IssuesPanel summary={mockSummary} featureCollection={null} onSelectFeature={jest.fn()} />
     );
     expect(screen.getByText("No issues found")).toBeInTheDocument();
   });
@@ -1006,7 +1005,7 @@ describe("IssuesPanel", () => {
       ...mockSummary,
       issues: [issueFixable, issueNotFixable],
     };
-    render(<IssuesPanel summary={summary} onSelectFeature={jest.fn()} />);
+    render(<IssuesPanel summary={summary} featureCollection={null} onSelectFeature={jest.fn()} />);
     expect(screen.getByText("Self-intersection detected.")).toBeInTheDocument();
     expect(screen.getByText("Feature has no geometry.")).toBeInTheDocument();
   });
@@ -1016,7 +1015,7 @@ describe("IssuesPanel", () => {
       ...mockSummary,
       issues: [issueFixable],
     };
-    render(<IssuesPanel summary={summary} onSelectFeature={jest.fn()} />);
+    render(<IssuesPanel summary={summary} featureCollection={null} onSelectFeature={jest.fn()} />);
     expect(screen.getByText(/invalid_geometry/i)).toBeInTheDocument();
   });
 
@@ -1025,7 +1024,7 @@ describe("IssuesPanel", () => {
       ...mockSummary,
       issues: [issueFixable],
     };
-    render(<IssuesPanel summary={summary} onSelectFeature={jest.fn()} />);
+    render(<IssuesPanel summary={summary} featureCollection={null} onSelectFeature={jest.fn()} />);
     expect(screen.getByText(/feature #0/i)).toBeInTheDocument();
   });
 
@@ -1034,7 +1033,7 @@ describe("IssuesPanel", () => {
       ...mockSummary,
       issues: [issueFixable], // issueFixable has feature_id: 1
     };
-    render(<IssuesPanel summary={summary} onSelectFeature={jest.fn()} />);
+    render(<IssuesPanel summary={summary} featureCollection={null} onSelectFeature={jest.fn()} />);
     expect(screen.getByText(/fid: 1/i)).toBeInTheDocument();
   });
 
@@ -1046,6 +1045,7 @@ describe("IssuesPanel", () => {
     render(
       <IssuesPanel
         summary={summary}
+        featureCollection={null}
         onSelectFeature={jest.fn()}
         onApplyFix={jest.fn()}
       />
@@ -1058,7 +1058,7 @@ describe("IssuesPanel", () => {
       ...mockSummary,
       issues: [issueFixable],
     };
-    render(<IssuesPanel summary={summary} onSelectFeature={jest.fn()} />);
+    render(<IssuesPanel summary={summary} featureCollection={null} onSelectFeature={jest.fn()} />);
     expect(screen.queryByText(/apply fix/i)).not.toBeInTheDocument();
   });
 
@@ -1071,6 +1071,7 @@ describe("IssuesPanel", () => {
     render(
       <IssuesPanel
         summary={summary}
+        featureCollection={null}
         onSelectFeature={jest.fn()}
         onApplyFix={onApplyFix}
       />
@@ -1086,7 +1087,7 @@ describe("IssuesPanel", () => {
       issues: [issueFixable],
     };
     render(
-      <IssuesPanel summary={summary} onSelectFeature={onSelectFeature} />
+      <IssuesPanel summary={summary} featureCollection={null} onSelectFeature={onSelectFeature} />
     );
     fireEvent.click(screen.getByText(/feature #0/i));
     expect(onSelectFeature).toHaveBeenCalledWith(0);
@@ -1106,7 +1107,9 @@ describe("IssuesPanel", () => {
       ],
     };
     const onSelectFeature = jest.fn();
-    render(<IssuesPanel summary={summary} onSelectFeature={onSelectFeature} />);
+    render(
+      <IssuesPanel summary={summary} featureCollection={null} onSelectFeature={onSelectFeature} />
+    );
     expect(screen.getByText(/duplicate group 1/i)).toBeInTheDocument();
     fireEvent.click(screen.getByText("#2"));
     expect(onSelectFeature).toHaveBeenCalledWith(2);
@@ -1123,7 +1126,12 @@ describe("IssuesPanel", () => {
       issues: [issueFixable, issue2],
     };
     render(
-      <IssuesPanel summary={summary} onSelectFeature={jest.fn()} onApplyFix={jest.fn()} />
+      <IssuesPanel
+        summary={summary}
+        featureCollection={null}
+        onSelectFeature={jest.fn()}
+        onApplyFix={jest.fn()}
+      />
     );
     expect(screen.getByText(/fix all/i)).toBeInTheDocument();
   });
@@ -1136,7 +1144,7 @@ describe("IssuesPanel", () => {
 describe("Header", () => {
   it("renders brand name", () => {
     render(
-      <Header filename={null} onReset={jest.fn()} hasPending={false} isSaving={false} />
+      <Header filename={null} onReset={jest.fn()} hasUnsavedChanges={false} isSaving={false} />
     );
     expect(screen.getByText(/GeoJSON Farm Dashboard/i)).toBeInTheDocument();
   });
@@ -1146,7 +1154,7 @@ describe("Header", () => {
       <Header
         filename="fields.geojson"
         onReset={jest.fn()}
-        hasPending={false}
+        hasUnsavedChanges={false}
         isSaving={false}
       />
     );
@@ -1155,14 +1163,14 @@ describe("Header", () => {
 
   it("does not show filename badge when filename is null", () => {
     render(
-      <Header filename={null} onReset={jest.fn()} hasPending={false} isSaving={false} />
+      <Header filename={null} onReset={jest.fn()} hasUnsavedChanges={false} isSaving={false} />
     );
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("shows New File button only when a file is loaded", () => {
     const { rerender } = render(
-      <Header filename={null} onReset={jest.fn()} hasPending={false} isSaving={false} />
+      <Header filename={null} onReset={jest.fn()} hasUnsavedChanges={false} isSaving={false} />
     );
     expect(screen.queryByText(/new file/i)).not.toBeInTheDocument();
 
@@ -1170,21 +1178,21 @@ describe("Header", () => {
       <Header
         filename="fields.geojson"
         onReset={jest.fn()}
-        hasPending={false}
+        hasUnsavedChanges={false}
         isSaving={false}
       />
     );
     expect(screen.getByText(/new file/i)).toBeInTheDocument();
   });
 
-  it("shows Save button only when there are pending edits and onAnalyse is provided", () => {
-    const onAnalyse = jest.fn();
+  it("shows Save button only when there are unsaved changes and onSave is provided", () => {
+    const onSave = jest.fn();
     const { rerender } = render(
       <Header
         filename="f.geojson"
         onReset={jest.fn()}
-        onAnalyse={onAnalyse}
-        hasPending={false}
+        onSave={onSave}
+        hasUnsavedChanges={false}
         isSaving={false}
       />
     );
@@ -1194,22 +1202,17 @@ describe("Header", () => {
       <Header
         filename="f.geojson"
         onReset={jest.fn()}
-        onAnalyse={onAnalyse}
-        hasPending={true}
+        onSave={onSave}
+        hasUnsavedChanges={true}
         isSaving={false}
       />
     );
     expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument();
   });
 
-  it("does not show Save button when hasPending is true but onAnalyse is not provided", () => {
+  it("does not show Save button when hasUnsavedChanges is true but onSave is not provided", () => {
     render(
-      <Header
-        filename="f.geojson"
-        onReset={jest.fn()}
-        hasPending={true}
-        isSaving={false}
-      />
+      <Header filename="f.geojson" onReset={jest.fn()} hasUnsavedChanges={true} isSaving={false} />
     );
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
   });
@@ -1219,8 +1222,8 @@ describe("Header", () => {
       <Header
         filename="f.geojson"
         onReset={jest.fn()}
-        onAnalyse={jest.fn()}
-        hasPending={true}
+        onSave={jest.fn()}
+        hasUnsavedChanges={true}
         isSaving={true}
       />
     );
@@ -1230,12 +1233,7 @@ describe("Header", () => {
   it("calls onReset when New File is clicked", () => {
     const onReset = jest.fn();
     render(
-      <Header
-        filename="f.geojson"
-        onReset={onReset}
-        hasPending={false}
-        isSaving={false}
-      />
+      <Header filename="f.geojson" onReset={onReset} hasUnsavedChanges={false} isSaving={false} />
     );
     fireEvent.click(screen.getByText(/new file/i));
     expect(onReset).toHaveBeenCalled();
@@ -1248,7 +1246,7 @@ describe("Header", () => {
         filename="f.geojson"
         onReset={jest.fn()}
         onDownload={onDownload}
-        hasPending={false}
+        hasUnsavedChanges={false}
         isSaving={false}
       />
     );
@@ -1256,19 +1254,19 @@ describe("Header", () => {
     expect(onDownload).toHaveBeenCalled();
   });
 
-  it("calls onAnalyse when Save is clicked", () => {
-    const onAnalyse = jest.fn();
+  it("calls onSave when Save is clicked", () => {
+    const onSave = jest.fn();
     render(
       <Header
         filename="f.geojson"
         onReset={jest.fn()}
-        onAnalyse={onAnalyse}
-        hasPending={true}
+        onSave={onSave}
+        hasUnsavedChanges={true}
         isSaving={false}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
-    expect(onAnalyse).toHaveBeenCalled();
+    expect(onSave).toHaveBeenCalled();
   });
 });
 
@@ -1278,9 +1276,7 @@ describe("Header", () => {
 
 describe("FeatureTable", () => {
   it("renders a 'No results' message when the store has no data", () => {
-    renderWithStore(
-      <FeatureTable onSelectFeature={jest.fn()} />,
-    );
+    renderWithStore(<FeatureTable onSelectFeature={jest.fn()} />);
     // With no data, totalFiltered = 0 → "No results"
     expect(screen.getByText(/no results/i)).toBeInTheDocument();
   });
@@ -1291,10 +1287,7 @@ describe("FeatureTable", () => {
       makeMockFeature(1, false, false),
       makeMockFeature(2, true, true),
     ];
-    renderWithStore(
-      <FeatureTable onSelectFeature={jest.fn()} />,
-      makeLoadedState(features)
-    );
+    renderWithStore(<FeatureTable onSelectFeature={jest.fn()} />, makeLoadedState(features));
     // The count and "features" label are split across child <span> nodes inside
     // a single <p>, so we match on the <p> element's combined textContent.
     expect(
@@ -1344,10 +1337,7 @@ describe("FeatureTable", () => {
   it("calls onSelectFeature when a data row is clicked", () => {
     const onSelect = jest.fn();
     const features = [makeMockFeature(0, true, false)];
-    renderWithStore(
-      <FeatureTable onSelectFeature={onSelect} />,
-      makeLoadedState(features)
-    );
+    renderWithStore(<FeatureTable onSelectFeature={onSelect} />, makeLoadedState(features));
     const rows = screen.getAllByRole("row");
     // rows[0] is header, rows[1] is data
     fireEvent.click(rows[1]);
@@ -1356,10 +1346,7 @@ describe("FeatureTable", () => {
 
   it("renders geometry type in rows", () => {
     const features = [makeMockFeature(0, true, false)];
-    renderWithStore(
-      <FeatureTable onSelectFeature={jest.fn()} />,
-      makeLoadedState(features)
-    );
+    renderWithStore(<FeatureTable onSelectFeature={jest.fn()} />, makeLoadedState(features));
     expect(screen.getByText("Polygon")).toBeInTheDocument();
   });
 
@@ -1383,37 +1370,27 @@ describe("FeatureTable", () => {
 
 describe("UploadZone", () => {
   it("renders idle state with upload prompt", () => {
-    render(
-      <UploadZone onUpload={jest.fn()} status="idle" progress={0} error={null} />
-    );
+    render(<UploadZone onUpload={jest.fn()} status="idle" progress={0} error={null} />);
     expect(screen.getByText(/drag & drop a \.geojson file/i)).toBeInTheDocument();
   });
 
   it("renders browse text in idle state", () => {
-    render(
-      <UploadZone onUpload={jest.fn()} status="idle" progress={0} error={null} />
-    );
+    render(<UploadZone onUpload={jest.fn()} status="idle" progress={0} error={null} />);
     expect(screen.getByText(/browse to upload/i)).toBeInTheDocument();
   });
 
   it("renders file constraint hint", () => {
-    render(
-      <UploadZone onUpload={jest.fn()} status="idle" progress={0} error={null} />
-    );
+    render(<UploadZone onUpload={jest.fn()} status="idle" progress={0} error={null} />);
     expect(screen.getByText(/only \.geojson files accepted/i)).toBeInTheDocument();
   });
 
   it("renders uploading state with progress percentage", () => {
-    render(
-      <UploadZone onUpload={jest.fn()} status="uploading" progress={42} error={null} />
-    );
+    render(<UploadZone onUpload={jest.fn()} status="uploading" progress={42} error={null} />);
     expect(screen.getByText(/processing\.\.\. 42%/i)).toBeInTheDocument();
   });
 
   it("renders 100% progress", () => {
-    render(
-      <UploadZone onUpload={jest.fn()} status="uploading" progress={100} error={null} />
-    );
+    render(<UploadZone onUpload={jest.fn()} status="uploading" progress={100} error={null} />);
     expect(screen.getByText(/100%/i)).toBeInTheDocument();
   });
 
@@ -1432,9 +1409,7 @@ describe("UploadZone", () => {
   it("renders an error when status is error but error prop is null (no message shown)", () => {
     // Should not crash with null error
     expect(() =>
-      render(
-        <UploadZone onUpload={jest.fn()} status="error" progress={0} error={null} />
-      )
+      render(<UploadZone onUpload={jest.fn()} status="error" progress={0} error={null} />)
     ).not.toThrow();
   });
 });

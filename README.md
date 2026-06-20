@@ -17,7 +17,7 @@ A full-stack web application for uploading, validating, visualising, and editing
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 16 · TypeScript · Redux Toolkit 2 · Tailwind CSS · MapLibre GL JS · Turf.js |
+| Frontend | Next.js 16 · TypeScript · Redux Toolkit 2 · Tailwind CSS · MapLibre GL JS |
 | Backend | FastAPI · Shapely · Pydantic v2 · Loguru |
 | Containerisation | Docker · Docker Compose |
 
@@ -164,7 +164,7 @@ geojson-dashboard/
     │   │   ├── hooks.ts           # Typed useAppDispatch / useAppSelector
     │   │   ├── dashboardSlice.ts  # Upload + analysis + feature-edit state
     │   │   ├── tableSlice.ts      # Filter / search / sort / pagination UI state
-    │   │   ├── dashboardThunks.ts # uploadFile and analyseCurrentFC thunks
+    │   │   ├── dashboardThunks.ts # uploadFile and saveChanges thunks
     │   │   └── selectors.ts      # Memoised derived-data selectors
     │   ├── types/
     │   │   └── index.ts          # Shared TypeScript interfaces (mirrors backend Pydantic models)
@@ -183,10 +183,9 @@ See the interactive Swagger docs at `http://localhost:8000/docs`.
 
 | Method | Path                    | Description                                         |
 |--------|-------------------------|-----------------------------------------------------|
-| `GET`  | `/health`               | Liveness probe                                      |
-| `POST` | `/api/geojson/upload`   | Upload and process a `.geojson` file                |
-| `POST` | `/api/geojson/update`   | Re-analyse an edited FeatureCollection              |
-| `POST` | `/api/geojson/validate` | Validate a file; returns summary only (no features) |
+| `GET`  | `/health`             | Liveness probe                          |
+| `POST` | `/api/geojson/upload` | Upload and process a `.geojson` file    |
+| `POST` | `/api/geojson/save`   | Save and re-analyse an edited FeatureCollection |
 
 ## Architecture overview
 

@@ -21,7 +21,6 @@ from app.models.geojson_models import FeatureCollectionModel
 from app.services.geojson_service import GeoJSONProcessingService
 from main import app
 
-
 # ---------------------------------------------------------------------------
 # Shared test fixtures (plain dicts — parsed lazily inside tests)
 # ---------------------------------------------------------------------------
@@ -127,9 +126,7 @@ INVALID_GEOMETRY_GEOJSON: dict = {
 
 NULL_GEOMETRY_GEOJSON: dict = {
     "type": "FeatureCollection",
-    "features": [
-        {"type": "Feature", "properties": {}, "geometry": None}
-    ],
+    "features": [{"type": "Feature", "properties": {}, "geometry": None}],
 }
 
 
@@ -247,9 +244,7 @@ class TestGeoJSONProcessingService:
     # --- edge cases ---
 
     def test_empty_feature_collection(self) -> None:
-        fc = FeatureCollectionModel(
-            **{"type": "FeatureCollection", "features": []}
-        )
+        fc = FeatureCollectionModel(**{"type": "FeatureCollection", "features": []})
         features, summary = self.service.process_feature_collection(fc)
 
         assert summary.total_features == 0
@@ -314,7 +309,11 @@ class TestUploadEndpoint:
                 files=[
                     (
                         "file",
-                        ("bad.geojson", BytesIO(b"not json!!!"), "application/geo+json"),
+                        (
+                            "bad.geojson",
+                            BytesIO(b"not json!!!"),
+                            "application/geo+json",
+                        ),
                     )
                 ],
             )
@@ -380,15 +379,15 @@ class TestUploadEndpoint:
 
 
 @pytest.mark.asyncio
-class TestUpdateEndpoint:
-    """Integration tests for POST /api/geojson/update."""
+class TestSaveEndpoint:
+    """Integration tests for POST /api/geojson/save."""
 
-    async def test_update_valid_collection_returns_200(self) -> None:
+    async def test_save_valid_collection_returns_200(self) -> None:
         payload = {"feature_collection": VALID_GEOJSON}
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
-            response = await client.post("/api/geojson/update", json=payload)
+            response = await client.post("/api/geojson/save", json=payload)
 
         assert response.status_code == 200
         body = response.json()
@@ -397,46 +396,25 @@ class TestUpdateEndpoint:
         assert "features" in body
         assert body["summary"]["total_features"] == 2
 
-    async def test_update_detects_duplicates(self) -> None:
+    async def test_save_detects_duplicates(self) -> None:
         payload = {"feature_collection": DUPLICATE_GEOJSON}
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
-            response = await client.post("/api/geojson/update", json=payload)
+            response = await client.post("/api/geojson/save", json=payload)
 
         assert response.status_code == 200
         assert response.json()["summary"]["duplicate_groups"] == 1
 
-    async def test_update_empty_collection(self) -> None:
-        payload = {
-            "feature_collection": {"type": "FeatureCollection", "features": []}
-        }
+    async def test_save_empty_collection(self) -> None:
+        payload = {"feature_collection": {"type": "FeatureCollection", "features": []}}
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
-            response = await client.post("/api/geojson/update", json=payload)
+            response = await client.post("/api/geojson/save", json=payload)
 
         assert response.status_code == 200
         assert response.json()["summary"]["total_features"] == 0
-
-
-@pytest.mark.asyncio
-class TestValidateEndpoint:
-    """Integration tests for POST /api/geojson/validate."""
-
-    async def test_validate_returns_summary_only(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.post(
-                "/api/geojson/validate", files=[_upload_file(VALID_GEOJSON)]
-            )
-
-        assert response.status_code == 200
-        body = response.json()
-        # Should return only the summary fields, not the full features list.
-        assert "total_features" in body
-        assert "features" not in body
 
 
 @pytest.mark.asyncio

@@ -2,9 +2,8 @@
 GeoJSON API Router.
 
 Endpoints:
-  POST /upload   — upload a .geojson file, get back a full analysis report.
-  POST /update   — re-analyse an edited FeatureCollection (called on Save & Analyse).
-  POST /validate — lightweight validation; returns only the analysis summary.
+  POST /upload — upload a .geojson file, get back a full analysis report.
+  POST /save   — re-analyse an edited FeatureCollection (called by the Save button).
 """
 
 import json
@@ -15,7 +14,7 @@ from loguru import logger
 from app.models.geojson_models import (
     FeatureCollectionModel,
     ProcessGeoJSONResponse,
-    UpdateFeaturesRequest,
+    SaveFeaturesRequest,
 )
 from app.services.geojson_service import GeoJSONProcessingService
 from app.utils.file_validation import read_and_validate_geojson
@@ -34,7 +33,7 @@ _service = GeoJSONProcessingService()
     ),
 )
 async def upload_geojson(
-    file: UploadFile = File(..., description="A .geojson file to process"),
+    file: UploadFile = File(..., description="A .geojson file to process"),  # noqa: B008
 ) -> ProcessGeoJSONResponse:
     """
     Validate, parse, and analyse a GeoJSON FeatureCollection uploaded as a file.
@@ -72,26 +71,26 @@ async def upload_geojson(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred while processing the file: {exc}",
-        )
+        ) from exc
 
 
 @router.post(
-    "/update",
+    "/save",
     response_model=ProcessGeoJSONResponse,
-    summary="Re-analyse an edited FeatureCollection",
+    summary="Save and re-analyse an edited FeatureCollection",
     description=(
         "Accepts an edited FeatureCollection (from the map or table editor) and "
-        "returns it re-validated.  The response shape is identical to /upload so "
+        "returns it re-validated. The response shape is identical to /upload so "
         "the frontend can refresh all panels without special-casing."
     ),
 )
-async def update_features(
-    request: UpdateFeaturesRequest,
+async def save_features(
+    request: SaveFeaturesRequest,
 ) -> ProcessGeoJSONResponse:
     """
     Re-validate an edited FeatureCollection and return a fresh analysis report.
 
-    Called when the user clicks *Save & Analyse* in the dashboard.
+    Called when the user clicks *Save* in the dashboard header.
 
     Raises:
         HTTPException 500: unexpected processing error.
@@ -101,11 +100,9 @@ async def update_features(
             request.feature_collection
         )
 
-        file_size = len(
-            json.dumps(request.feature_collection.model_dump()).encode()
-        )
+        file_size = len(json.dumps(request.feature_collection.model_dump()).encode())
         logger.info(
-            f"Re-analysed: {summary.total_features} features, "
+            f"Saved: {summary.total_features} features, "
             f"{summary.invalid_features} invalid, "
             f"{summary.duplicate_groups} duplicate groups"
         )
@@ -118,28 +115,8 @@ async def update_features(
         )
 
     except Exception as exc:
-        logger.exception(f"Error re-analysing collection: {exc}")
+        logger.exception(f"Error saving collection: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to re-analyse feature collection: {exc}",
-        )
-
-
-@router.post(
-    "/validate",
-    summary="Validate a GeoJSON file without storing it",
-    description="Lightweight validation endpoint — returns only the analysis summary.",
-)
-async def validate_geojson(
-    file: UploadFile = File(...),
-) -> dict:
-    """
-    Parse and validate a GeoJSON file, returning only the summary.
-
-    Cheaper than /upload because it skips building the full feature list.
-    Useful for pre-flight checks from external tools.
-    """
-    raw_data = await read_and_validate_geojson(file)
-    feature_collection = FeatureCollectionModel(**raw_data)
-    _, summary = _service.process_feature_collection(feature_collection)
-    return summary.model_dump()
+            detail=f"Failed to save feature collection: {exc}",
+        ) from exc

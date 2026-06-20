@@ -14,7 +14,6 @@ from loguru import logger
 from app.config import settings
 from app.routers import geojson
 
-
 # ---------------------------------------------------------------------------
 # Logging configuration
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ any expensive processing occurs.
 """
 
 import json
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
 from loguru import logger
@@ -22,7 +22,7 @@ MAX_BYTES: int = settings.max_upload_size_mb * 1024 * 1024
 _ACCEPTED_TYPES = {"FeatureCollection", "Feature", "GeometryCollection"}
 
 
-async def read_and_validate_geojson(file: UploadFile) -> Dict[str, Any]:
+async def read_and_validate_geojson(file: UploadFile) -> dict[str, Any]:
     """
     Read an uploaded file and validate it as a GeoJSON FeatureCollection.
 
@@ -51,8 +51,7 @@ async def read_and_validate_geojson(file: UploadFile) -> Dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "Only .geojson files are accepted. "
-                "Please upload a valid GeoJSON file."
+                "Only .geojson files are accepted. Please upload a valid GeoJSON file."
             ),
         )
 
@@ -69,13 +68,13 @@ async def read_and_validate_geojson(file: UploadFile) -> Dict[str, Any]:
 
     # 3. Parse JSON; reject non-UTF-8 and malformed content.
     try:
-        data: Dict[str, Any] = json.loads(content.decode("utf-8"))
+        data: dict[str, Any] = json.loads(content.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         logger.warning(f"File '{filename}' is not valid JSON: {exc}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File is not valid JSON: {exc}",
-        )
+        ) from exc
 
     # 4. Check the GeoJSON type field.
     geojson_type = data.get("type")
@@ -93,9 +92,7 @@ async def read_and_validate_geojson(file: UploadFile) -> Dict[str, Any]:
     if geojson_type == "FeatureCollection" and "features" not in data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Invalid GeoJSON FeatureCollection: missing 'features' array."
-            ),
+            detail=("Invalid GeoJSON FeatureCollection: missing 'features' array."),
         )
 
     logger.info(

@@ -23,11 +23,7 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredPaths: [
-          "dashboard.featureCollection",
-          "dashboard.pendingFC",
-          "dashboard.response",
-        ],
+        ignoredPaths: ["dashboard.featureCollection", "dashboard.response"],
       },
     }),
 });

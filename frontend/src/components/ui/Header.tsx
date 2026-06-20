@@ -10,25 +10,30 @@ interface HeaderProps {
   filename: string | null;
   onReset: () => void;
   onDownload?: () => void;
-  onAnalyse?: () => void;
-  hasPending: boolean;
+  onSave?: () => void;
+  hasUnsavedChanges: boolean;
   isSaving: boolean;
 }
 
-export function Header({ filename, onReset, onDownload, onAnalyse, hasPending, isSaving }: HeaderProps) {
+export function Header({
+  filename,
+  onReset,
+  onDownload,
+  onSave,
+  hasUnsavedChanges,
+  isSaving,
+}: HeaderProps) {
   return (
-    <header className="border-b border-slate-700 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-      <div className="max-w-[1600px] mx-auto px-4 md:px-6 h-14 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 border-b border-slate-700 bg-slate-900/80 backdrop-blur">
+      <div className="mx-auto flex h-14 max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6">
         {/* Brand */}
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0">
-            <MapPin className="w-4 h-4 text-white" />
+          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-green-500">
+            <MapPin className="h-4 w-4 text-white" />
           </div>
-          <span className="font-semibold text-sm tracking-tight">
-            GeoJSON Farm Dashboard
-          </span>
+          <span className="text-sm font-semibold tracking-tight">GeoJSON Farm Dashboard</span>
           {filename && (
-            <span className="hidden sm:inline-flex items-center gap-1 text-xs text-slate-400 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full truncate max-w-[220px]">
+            <span className="hidden max-w-[220px] items-center gap-1 truncate rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-xs text-slate-400 sm:inline-flex">
               {filename}
             </span>
           )}
@@ -36,31 +41,31 @@ export function Header({ filename, onReset, onDownload, onAnalyse, hasPending, i
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {onAnalyse && hasPending && (
+          {onSave && hasUnsavedChanges && (
             <button
-              onClick={onAnalyse}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+              onClick={onSave}
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-500"
               disabled={isSaving}
             >
-              <Save className="w-3.5 h-3.5" />
+              <Save className="h-3.5 w-3.5" />
               Save
             </button>
           )}
           {onDownload && (
             <button
               onClick={onDownload}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors"
+              className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-500"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="h-3.5 w-3.5" />
               Download
             </button>
           )}
           {filename && (
             <button
               onClick={onReset}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-slate-700"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="h-3.5 w-3.5" />
               New File
             </button>
           )}

@@ -3,9 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Required for Docker standalone output
   output: "standalone",
-  
+
   // Allow CORS requests from localhost during development
-  allowedDevOrigins: ['127.0.0.1', 'localhost'],
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
 
   // Allow large file uploads via Server Actions
   experimental: {

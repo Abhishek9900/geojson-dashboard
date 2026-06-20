@@ -21,15 +21,7 @@ import type { FeatureCollection, Feature, Polygon, Point, GeoJsonProperties } fr
 import type { ProcessedFeature } from "@/types";
 import { computeFeatureBBox, getFeatureColor } from "@/lib/geojson-utils";
 import type { LegendFilter } from "@/lib/geojson-utils";
-import {
-  Pencil,
-  Trash2,
-  Check,
-  X,
-  Pentagon,
-  Dot,
-  Edit3,
-} from "lucide-react";
+import { Pencil, Trash2, Check, X, Pentagon, Dot, Edit3 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,6 +84,18 @@ export function MapView({
   const editedFCRef = useRef<FeatureCollection>(featureCollection);
   const isEditingRef = useRef(false);
   const drawToolRef = useRef<DrawTool>("none");
+  // Tracks the last featureCollection prop value we've synced into editedFC,
+  // so we can adjust state during render instead of in an effect.
+  const lastSyncedFCRef = useRef<FeatureCollection>(featureCollection);
+
+  // Keep featureCollection prop → editedFC when not in edit mode.
+  // Adjusting state during render (rather than in an effect) avoids an
+  // extra render pass — see https://react.dev/learn/you-might-not-need-an-effect
+  if (!isEditing && featureCollection !== lastSyncedFCRef.current) {
+    lastSyncedFCRef.current = featureCollection;
+    editedFCRef.current = featureCollection;
+    setEditedFC(featureCollection);
+  }
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -102,27 +106,19 @@ export function MapView({
    * each feature's properties, taking legendFilter and selectedIndex into account.
    */
   const buildDisplayFC = useCallback(
-    (
-      fc: FeatureCollection,
-      selected: number | null,
-      lFilter: LegendFilter
-    ) => ({
+    (fc: FeatureCollection, selected: number | null, lFilter: LegendFilter) => ({
       ...fc,
       features: fc.features.map((f, idx) => {
         const originalIdx: number | undefined = f.properties?._originalIndex;
         const pf = originalIdx != null ? processedFeatures[originalIdx] : undefined;
         const isDrawn = originalIdx == null; // no _originalIndex → newly drawn
         const isSelected = idx === selected;
-        const isValid = pf ? pf.is_valid : true;      // drawn features default valid
+        const isValid = pf ? pf.is_valid : true; // drawn features default valid
         const isDuplicate = pf ? pf.is_duplicate : false;
 
         // Category for legend filtering — selected does NOT override invalid/duplicate
         // so that an invalid feature stays in "invalid" bucket when selected.
-        const category: LegendFilter = isDuplicate
-          ? "duplicate"
-          : !isValid
-          ? "invalid"
-          : "valid";
+        const category: LegendFilter = isDuplicate ? "duplicate" : !isValid ? "invalid" : "valid";
 
         // If a legend filter is active, dim features not in that category
         // (selected features are always shown)
@@ -133,8 +129,8 @@ export function MapView({
         const fillColor = dimmed
           ? "#94a3b8"
           : isDrawn
-          ? "#f59e0b"                                  // drawn features: amber
-          : getFeatureColor(isValid, isDuplicate, false); // never pass isSelected
+            ? "#f59e0b" // drawn features: amber
+            : getFeatureColor(isValid, isDuplicate, false); // never pass isSelected
 
         return {
           ...f,
@@ -383,8 +379,7 @@ export function MapView({
             map.getCanvas().style.cursor = "pointer";
         });
         map.on("mouseleave", "feature-fill", () => {
-          map.getCanvas().style.cursor =
-            drawToolRef.current !== "none" ? "crosshair" : "";
+          map.getCanvas().style.cursor = drawToolRef.current !== "none" ? "crosshair" : "";
         });
 
         // Initial fit to data
@@ -417,16 +412,6 @@ export function MapView({
     // Use editedFC so newly drawn features are also zoomed to
     flyToFeature(selectedIndex, editedFC);
   }, [selectedIndex, flyToFeature, editedFC]);
-
-  // Keep featureCollection prop → editedFC when not in edit mode
-  useEffect(() => {
-    if (!isEditing) {
-      setEditedFC(featureCollection);
-      editedFCRef.current = featureCollection;
-      refreshSource(featureCollection, selectedIndex, legendFilter);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [featureCollection]);
 
   // Keep refs in sync
   useEffect(() => {
@@ -525,23 +510,23 @@ export function MapView({
   // Edit-mode actions
   // ---------------------------------------------------------------------------
 
-function handleDeleteSelected() {
-  if (selectedIndex == null || selectedIndex < 0) return;
-  const targetFeature = editedFC.features[selectedIndex];
-  const targetOriginalIndex = targetFeature?.properties?._originalIndex as number | undefined;
+  function handleDeleteSelected() {
+    if (selectedIndex == null || selectedIndex < 0) return;
+    const targetFeature = editedFC.features[selectedIndex];
+    const targetOriginalIndex = targetFeature?.properties?._originalIndex as number | undefined;
 
-  const updated: FeatureCollection = {
-    ...editedFC,
-    features: editedFC.features.filter((f, i) =>
-      targetOriginalIndex != null
-        ? f.properties?._originalIndex !== targetOriginalIndex
-        : i !== selectedIndex
-    ),
-  };
-  editedFCRef.current = updated;
-  setEditedFC(updated);
-  onSelectFeature(-1);
-}
+    const updated: FeatureCollection = {
+      ...editedFC,
+      features: editedFC.features.filter((f, i) =>
+        targetOriginalIndex != null
+          ? f.properties?._originalIndex !== targetOriginalIndex
+          : i !== selectedIndex
+      ),
+    };
+    editedFCRef.current = updated;
+    setEditedFC(updated);
+    onSelectFeature(-1);
+  }
 
   function handleOpenAttrEdit() {
     if (selectedIndex == null || selectedIndex < 0) return;
@@ -559,9 +544,7 @@ function handleDeleteSelected() {
     const updated: FeatureCollection = {
       ...editedFC,
       features: editedFC.features.map((f, i) =>
-        i === attrEdit.featureIndex
-          ? { ...f, properties: { ...attrEdit.properties } }
-          : f
+        i === attrEdit.featureIndex ? { ...f, properties: { ...attrEdit.properties } } : f
       ),
     };
     editedFCRef.current = updated;
@@ -613,9 +596,9 @@ function handleDeleteSelected() {
   const hasSelection = selectedIndex != null && selectedIndex >= 0;
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative h-full w-full">
       {/* Map container */}
-      <div ref={mapContainer} className="w-full h-full" />
+      <div ref={mapContainer} className="h-full w-full" />
 
       {/* ------------------------------------------------------------------ */}
       {/* Top-right toolbar                                                   */}
@@ -624,69 +607,69 @@ function handleDeleteSelected() {
         {!isEditing ? (
           <button
             onClick={() => setIsEditing(true)}
-            className="flex items-center gap-1.5 text-xs bg-slate-900/90 backdrop-blur border border-slate-600 text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors shadow-lg"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-900/90 px-3 py-1.5 text-xs text-slate-200 shadow-lg backdrop-blur transition-colors hover:bg-slate-800"
           >
-            <Pencil className="w-3.5 h-3.5" />
+            <Pencil className="h-3.5 w-3.5" />
             Edit
           </button>
         ) : (
           <>
             {/* Draw tools */}
-            <div className="flex gap-1.5 bg-slate-900/90 backdrop-blur border border-slate-700 rounded-lg p-1.5 shadow-lg">
+            <div className="flex gap-1.5 rounded-lg border border-slate-700 bg-slate-900/90 p-1.5 shadow-lg backdrop-blur">
               <button
                 title="Draw polygon (click vertices, double-click to close)"
                 onClick={() => setDrawTool((t) => (t === "polygon" ? "none" : "polygon"))}
                 className={[
-                  "flex items-center gap-1 text-[11px] px-2 py-1 rounded transition-colors",
+                  "flex items-center gap-1 rounded px-2 py-1 text-[11px] transition-colors",
                   drawTool === "polygon"
-                    ? "bg-amber-500 text-slate-900 font-semibold"
+                    ? "bg-amber-500 font-semibold text-slate-900"
                     : "text-slate-300 hover:bg-slate-700",
                 ].join(" ")}
               >
-                <Pentagon className="w-3.5 h-3.5" />
+                <Pentagon className="h-3.5 w-3.5" />
                 Polygon
               </button>
               <button
                 title="Draw point (single click)"
                 onClick={() => setDrawTool((t) => (t === "point" ? "none" : "point"))}
                 className={[
-                  "flex items-center gap-1 text-[11px] px-2 py-1 rounded transition-colors",
+                  "flex items-center gap-1 rounded px-2 py-1 text-[11px] transition-colors",
                   drawTool === "point"
-                    ? "bg-amber-500 text-slate-900 font-semibold"
+                    ? "bg-amber-500 font-semibold text-slate-900"
                     : "text-slate-300 hover:bg-slate-700",
                 ].join(" ")}
               >
-                <Dot className="w-3.5 h-3.5" />
+                <Dot className="h-3.5 w-3.5" />
                 Point
               </button>
               {drawTool !== "none" && (
                 <button
                   title="Cancel drawing"
                   onClick={cancelDraw}
-                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded text-red-300 hover:bg-slate-700 transition-colors"
+                  className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-300 transition-colors hover:bg-slate-700"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
 
             {/* Selection actions */}
             {hasSelection && (
-              <div className="flex gap-1.5 bg-slate-900/90 backdrop-blur border border-slate-700 rounded-lg p-1.5 shadow-lg">
+              <div className="flex gap-1.5 rounded-lg border border-slate-700 bg-slate-900/90 p-1.5 shadow-lg backdrop-blur">
                 <button
                   title="Edit attributes of selected feature"
                   onClick={handleOpenAttrEdit}
-                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded text-blue-300 hover:bg-slate-700 transition-colors"
+                  className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-blue-300 transition-colors hover:bg-slate-700"
                 >
-                  <Edit3 className="w-3.5 h-3.5" />
+                  <Edit3 className="h-3.5 w-3.5" />
                   Attributes
                 </button>
                 <button
                   title="Delete selected feature"
                   onClick={handleDeleteSelected}
-                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded text-red-300 hover:bg-slate-700 transition-colors"
+                  className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-300 transition-colors hover:bg-slate-700"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="h-3.5 w-3.5" />
                   Delete #{selectedIndex}
                 </button>
               </div>
@@ -696,16 +679,16 @@ function handleDeleteSelected() {
             <div className="flex gap-1.5">
               <button
                 onClick={handleSaveEdits}
-                className="flex items-center gap-1.5 text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-500 transition-colors shadow-lg"
+                className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs text-white shadow-lg transition-colors hover:bg-green-500"
               >
-                <Check className="w-3.5 h-3.5" />
+                <Check className="h-3.5 w-3.5" />
                 Save
               </button>
               <button
                 onClick={handleCancelEdits}
-                className="flex items-center gap-1.5 text-xs bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-600 transition-colors shadow-lg"
+                className="flex items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-1.5 text-xs text-slate-200 shadow-lg transition-colors hover:bg-slate-600"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="h-3.5 w-3.5" />
                 Cancel
               </button>
             </div>
@@ -717,16 +700,16 @@ function handleDeleteSelected() {
       {/* Draw-in-progress instruction banner                                 */}
       {/* ------------------------------------------------------------------ */}
       {drawTool === "polygon" && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-amber-500/90 text-slate-900 text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg pointer-events-none">
+        <div className="pointer-events-none absolute top-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-amber-500/90 px-4 py-1.5 text-xs font-semibold text-slate-900 shadow-lg">
           {drawPoints.length === 0
             ? "Click to start polygon"
             : drawPoints.length < 3
-            ? `${drawPoints.length} point${drawPoints.length > 1 ? "s" : ""} — keep clicking`
-            : `${drawPoints.length} points — double-click to close`}
+              ? `${drawPoints.length} point${drawPoints.length > 1 ? "s" : ""} — keep clicking`
+              : `${drawPoints.length} points — double-click to close`}
         </div>
       )}
       {drawTool === "point" && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-amber-500/90 text-slate-900 text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg pointer-events-none">
+        <div className="pointer-events-none absolute top-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-amber-500/90 px-4 py-1.5 text-xs font-semibold text-slate-900 shadow-lg">
           Click map to place point
         </div>
       )}
@@ -734,9 +717,9 @@ function handleDeleteSelected() {
       {/* ------------------------------------------------------------------ */}
       {/* Clickable legend                                                     */}
       {/* ------------------------------------------------------------------ */}
-      <div className="absolute bottom-3 left-3 z-10 bg-slate-900/90 backdrop-blur border border-slate-700 rounded-lg px-3 py-2 text-[10px] space-y-1.5">
+      <div className="absolute bottom-3 left-3 z-10 space-y-1.5 rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-2 text-[10px] backdrop-blur">
         {legendFilter !== null && (
-          <p className="text-[9px] text-slate-400 mb-1 text-center">click to reset</p>
+          <p className="mb-1 text-center text-[9px] text-slate-400">click to reset</p>
         )}
         {LEGEND_ITEMS.map(({ color, label, filter }) => {
           const isActive = legendFilter === filter;
@@ -746,23 +729,21 @@ function handleDeleteSelected() {
               key={label}
               onClick={() => handleLegendClick(filter)}
               className={[
-                "flex items-center gap-2 w-full rounded px-1 py-0.5 transition-all",
-                isActive ? "ring-1 ring-white/30 bg-white/5" : "",
+                "flex w-full items-center gap-2 rounded px-1 py-0.5 transition-all",
+                isActive ? "bg-white/5 ring-1 ring-white/30" : "",
                 isDimmed ? "opacity-40" : "hover:bg-white/5",
               ].join(" ")}
               title={isActive ? "Click to show all" : `Filter to ${label} only`}
             >
               <div
-                className="w-3 h-3 rounded-sm flex-shrink-0 transition-all"
+                className="h-3 w-3 flex-shrink-0 rounded-sm transition-all"
                 style={{
                   backgroundColor: color,
                   opacity: isDimmed ? 0.4 : 1,
                 }}
               />
               <span className={isDimmed ? "text-slate-500" : "text-slate-300"}>{label}</span>
-              {isActive && (
-                <span className="ml-auto text-[8px] text-white/50">✓</span>
-              )}
+              {isActive && <span className="ml-auto text-[8px] text-white/50">✓</span>}
             </button>
           );
         })}
@@ -773,25 +754,23 @@ function handleDeleteSelected() {
       {/* ------------------------------------------------------------------ */}
       {attrEdit && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-80 max-h-[70%] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+          <div className="flex max-h-[70%] w-80 flex-col rounded-xl border border-slate-600 bg-slate-800 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
               <h3 className="text-sm font-semibold">
                 Edit Attributes — Feature #{attrEdit.featureIndex}
               </h3>
               <button
                 onClick={() => setAttrEdit(null)}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-slate-400 transition-colors hover:text-white"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 space-y-3 overflow-y-auto p-4">
               {Object.entries(attrEdit.properties).map(([key, value]) => (
                 <div key={key}>
-                  <label className="block text-[10px] text-slate-400 mb-1 font-mono">
-                    {key}
-                  </label>
+                  <label className="mb-1 block font-mono text-[10px] text-slate-400">{key}</label>
                   <input
                     type="text"
                     value={value}
@@ -805,7 +784,7 @@ function handleDeleteSelected() {
                           : null
                       )
                     }
-                    className="w-full bg-slate-900 border border-slate-600 rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-green-500 transition-colors"
+                    className="w-full rounded border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 transition-colors focus:border-green-500 focus:outline-none"
                   />
                 </div>
               ))}
@@ -814,24 +793,22 @@ function handleDeleteSelected() {
               <AddPropertyRow
                 onAdd={(key, value) =>
                   setAttrEdit((prev) =>
-                    prev
-                      ? { ...prev, properties: { ...prev.properties, [key]: value } }
-                      : null
+                    prev ? { ...prev, properties: { ...prev.properties, [key]: value } } : null
                   )
                 }
               />
             </div>
 
-            <div className="flex gap-2 px-4 py-3 border-t border-slate-700">
+            <div className="flex gap-2 border-t border-slate-700 px-4 py-3">
               <button
                 onClick={handleAttrSave}
-                className="flex-1 bg-green-600 hover:bg-green-500 text-white text-xs font-medium py-1.5 rounded-lg transition-colors"
+                className="flex-1 rounded-lg bg-green-600 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-500"
               >
                 Apply
               </button>
               <button
                 onClick={() => setAttrEdit(null)}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium py-1.5 rounded-lg transition-colors"
+                className="flex-1 rounded-lg bg-slate-700 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:bg-slate-600"
               >
                 Cancel
               </button>
@@ -860,15 +837,15 @@ function AddPropertyRow({ onAdd }: { onAdd: (key: string, value: string) => void
   }
 
   return (
-    <div className="pt-2 border-t border-slate-700">
-      <p className="text-[10px] text-slate-500 mb-1.5">Add property</p>
+    <div className="border-t border-slate-700 pt-2">
+      <p className="mb-1.5 text-[10px] text-slate-500">Add property</p>
       <div className="flex gap-1.5">
         <input
           type="text"
           placeholder="key"
           value={key}
           onChange={(e) => setKey(e.target.value)}
-          className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-green-500 font-mono"
+          className="flex-1 rounded border border-slate-600 bg-slate-900 px-2 py-1 font-mono text-xs text-slate-200 focus:border-green-500 focus:outline-none"
         />
         <input
           type="text"
@@ -876,11 +853,11 @@ function AddPropertyRow({ onAdd }: { onAdd: (key: string, value: string) => void
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-green-500"
+          className="flex-1 rounded border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-200 focus:border-green-500 focus:outline-none"
         />
         <button
           onClick={handleAdd}
-          className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2 rounded transition-colors"
+          className="rounded bg-slate-700 px-2 text-xs text-white transition-colors hover:bg-slate-600"
         >
           +
         </button>

@@ -11,11 +11,7 @@ export const metadata: Metadata = {
   description: "Upload, validate, analyse, and visualise GeoJSON farm boundary data.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={`${inter.className} bg-[#0f172a] text-slate-100 antialiased`}>

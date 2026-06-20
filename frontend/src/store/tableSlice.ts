@@ -12,7 +12,7 @@
 
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import type { FeatureFilter } from "@/types";
-import { resetDashboard, uploadSucceeded, analyseSucceeded } from "./dashboardSlice";
+import { resetDashboard, uploadSucceeded, saveSucceeded } from "./dashboardSlice";
 
 export type SortKey = "index" | "type" | "valid" | "duplicate" | "area";
 export type SortDir = "asc" | "desc";
@@ -52,10 +52,7 @@ const tableSlice = createSlice({
       state.currentPage = 1;
     },
 
-    sortChanged(
-      state,
-      action: PayloadAction<{ key: SortKey; dir: SortDir }>
-    ) {
+    sortChanged(state, action: PayloadAction<{ key: SortKey; dir: SortDir }>) {
       state.sortKey = action.payload.key;
       state.sortDir = action.payload.dir;
       state.currentPage = 1;
@@ -74,7 +71,7 @@ const tableSlice = createSlice({
     // Reset table UI whenever new data arrives or the user starts over.
     builder
       .addCase(uploadSucceeded, () => initialState)
-      .addCase(analyseSucceeded, (state) => {
+      .addCase(saveSucceeded, (state) => {
         // Keep filter and page size; reset to page 1 and clear search.
         state.currentPage = 1;
         state.searchQuery = "";
@@ -83,12 +80,7 @@ const tableSlice = createSlice({
   },
 });
 
-export const {
-  filterChanged,
-  searchQueryChanged,
-  sortChanged,
-  pageChanged,
-  pageSizeChanged,
-} = tableSlice.actions;
+export const { filterChanged, searchQueryChanged, sortChanged, pageChanged, pageSizeChanged } =
+  tableSlice.actions;
 
 export default tableSlice.reducer;
