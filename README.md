@@ -227,7 +227,3 @@ Full Stack Developer | Geodesy
 Bonn, Germany
 
 [Email](abhishek.kripal@uni-bonn.de) | [LinkedIn](https://www.linkedin.com/in/abhishek-kripal/) | [GitHub](https://github.com/Abhishek9900)
-
----
-
-*Document prepared for [GRAS Global Risk Assessment Services GmbH](https://www.gras-system.org/). Last updated: June 2026.*

@@ -622,4 +622,4 @@ Standard ESA S2 L2A uses the Sen2Cor algorithm, which processes each image indep
 
 ---
 
-*Document prepared for educational and research planning purposes for [GRAS Global Risk Assessment Services GmbH](https://www.gras-system.org/). Scope: Germany, 2020–2025. Last updated: June 2026.*
+*Document prepared for educational and research planning purposes. Scope: Germany, 2020–2025.*
