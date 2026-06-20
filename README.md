@@ -136,6 +136,8 @@ geojson-dashboard/
 │   ├── tests/
 │   │   └── test_geojson.py        # pytest test suite
 │   └── main.py                    # Application entry point
+└── docs/ # additional project documents
+└── sample_data/ # example .geojson data
 └── frontend/
     ├── src/
     │   ├── app/
